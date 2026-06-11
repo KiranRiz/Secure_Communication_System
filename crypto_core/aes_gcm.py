@@ -1,3 +1,4 @@
+# Added proper security comments and clarified AES-GCM + HKDF flow
 # security/aes_gcm.py
 # Author: Mubashir
 # Purpose: AES-256-GCM encryption — encrypts messages so only
@@ -48,7 +49,7 @@ class SecureMessage:
             plaintext.encode('utf-8'),
             None  # No additional data for now
         )
-#Note: Both nonce and ciphertext are needed to decrypt, so we return both.
+# Note: Both nonce and ciphertext are needed to decrypt, so we return both.
         return {
             "nonce": nonce.hex(),
             "ciphertext": ciphertext.hex()
