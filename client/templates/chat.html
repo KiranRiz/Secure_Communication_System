@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Chat</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="chat-page">
+
+    <!-- ── Top navigation bar ── -->
+    <header class="navbar">
+        <span class="logo">🔐 SecureChat</span>
+        <span class="nav-user">Logged in as: <strong>{{ username }}</strong></span>
+        <a href="/" class="btn-logout">Logout</a>
+    </header>
+
+    <div class="chat-layout">
+
+        <!-- ── Left sidebar: key exchange panel ── -->
+        <aside class="sidebar">
+            <h3>Connect to User</h3>
+
+            <!-- Step 1: enter peer username and start key exchange -->
+            <input type="text" id="peer-username" placeholder="Peer username">
+            <button onclick="startKeyExchange()">Connect</button>
+
+            <!-- Step 2: shows current connection status -->
+            <div id="connection-status" class="status-badge">Not connected</div>
+
+            <!-- Step 3: key fingerprint for MITM verification -->
+            <div class="fingerprint-section">
+                <p class="label">Your Key Fingerprint</p>
+                <code id="my-fingerprint">--</code>
+
+                <p class="label">Peer Fingerprint</p>
+                <code id="peer-fingerprint">--</code>
+
+                <small>Verify fingerprints match out-of-band to prevent MITM attacks</small>
+            </div>
+        </aside>
+
+        <!-- ── Main chat area ── -->
+        <main class="chat-main">
+
+            <!-- Message history -->
+            <div id="messages" class="messages-area">
+                <div class="system-msg">Connect to a peer to start encrypted chat</div>
+            </div>
+
+            <!-- Message input bar -->
+            <div class="input-bar">
+                <input
+                    type="text"
+                    id="message-input"
+                    placeholder="Type an encrypted message..."
+                    onkeydown="if(event.key==='Enter') sendMessage()"
+                    disabled
+                >
+                <button id="send-btn" onclick="sendMessage()" disabled>Send</button>
+            </div>
+
+        </main>
+
+    </div>
+
+    <!-- Socket.IO client library (served by the relay server) -->
+    <script src="{{ server_url }}/socket.io/socket.io.js"></script>
+
+    <!-- Pass Flask template variables into JavaScript -->
+    <script>
+        const USERNAME   = "{{ username }}";
+        const SERVER_URL = "{{ server_url }}";
+    </script>
+
+    <!-- Encryption and messaging logic -->
+    <script src="/static/chat.js"></script>
+
+</body>
+</html>
