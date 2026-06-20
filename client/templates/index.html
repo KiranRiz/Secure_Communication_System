@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Chat Login</title>
+</head>
+<body>
+
+    <div class="auth-container">
+
+        <h1>SecureChat</h1>
+        <p>End-to-End Encrypted Messaging</p>
+
+        <!-- Tab buttons to switch between Login and Register -->
+        <div class="tabs">
+            <button onclick="showTab('login')">Login</button>
+            <button onclick="showTab('register')">Register</button>
+        </div>
+
+        <!-- Login Form -->
+        <div id="login-form">
+            <input type="text"     id="login-username" placeholder="Username">
+            <input type="password" id="login-password" placeholder="Password">
+            <button onclick="handleLogin()">Login</button>
+        </div>
+
+        <!-- Register Form (hidden by default) -->
+        <div id="register-form" style="display:none">
+            <input type="text"     id="reg-username" placeholder="Choose Username">
+            <input type="password" id="reg-password" placeholder="Choose Password">
+            <input type="password" id="reg-confirm"  placeholder="Confirm Password">
+            <button onclick="handleRegister()">Create Account</button>
+        </div>
+
+        <!-- Status message shown after login/register attempt -->
+        <div id="message"></div>
+
+    </div>
+
+</body>
+</html>
