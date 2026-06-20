@@ -1,7 +1,7 @@
 /* style.css — Secure Chat UI */
 /* Author: Kiran */
 
-/* ── CSS Variables (colour palette & spacing) ─────────────────────────── */
+/* CSS Variables (colour palette & spacing) */
 :root {
     --bg-primary:    #0d1117;   /* dark page background */
     --bg-secondary:  #161b22;   /* card / panel background */
@@ -16,7 +16,6 @@
     --radius:        8px;         /* border radius used throughout */
 }
 
-/* ── Global Reset ─────────────────────────────────────────────────────── */
 *, *::before, *::after {
     box-sizing: border-box;
     margin:  0;
@@ -33,7 +32,6 @@ body {
     justify-content:  center;
 }
 
-/* ── Auth Page (Login / Register card) ───────────────────────────────── */
 .auth-container {
     background:    var(--bg-secondary);
     border:        1px solid var(--border-color);
@@ -56,7 +54,6 @@ body {
     margin-bottom: 1.5rem;
 }
 
-/* ── Tab buttons (Login | Register) ──────────────────────────────────── */
 .tabs {
     display:       flex;
     gap:           0.5rem;
@@ -82,7 +79,7 @@ body {
     border-color: var(--accent);
 }
 
-/* ── Input fields ─────────────────────────────────────────────────────── */
+
 input[type="text"],
 input[type="password"] {
     width:         100%;
@@ -102,7 +99,6 @@ input[type="password"]:focus {
     border-color: var(--accent);
 }
 
-/* ── Primary action button ────────────────────────────────────────────── */
 .auth-container button[onclick^="handle"] {
     width:         100%;
     padding:       0.7rem;
@@ -120,9 +116,175 @@ input[type="password"]:focus {
     background: var(--accent-hover);
 }
 
-/* ── Status message (success / error) ────────────────────────────────── */
 #message {
     margin-top: 0.9rem;
     font-size:  0.88rem;
     min-height: 1.2rem;
 }
+
+body.chat-page {
+    display:        block;
+    background:     var(--bg-primary);
+    height:         100vh;
+    overflow:       hidden;
+}
+
+
+.navbar {
+    display:          flex;
+    align-items:      center;
+    gap:              1rem;
+    padding:          0.75rem 1.5rem;
+    background:       var(--bg-secondary);
+    border-bottom:    1px solid var(--border-color);
+}
+
+.navbar .logo      { font-weight: bold; font-size: 1.1rem; color: var(--accent); flex: 1; }
+.navbar .nav-user  { font-size: 0.9rem; color: var(--text-muted); }
+
+.btn-logout {
+    padding:          0.35rem 0.8rem;
+    background:       transparent;
+    color:            var(--text-muted);
+    border:           1px solid var(--border-color);
+    border-radius:    var(--radius);
+    text-decoration:  none;
+    font-size:        0.85rem;
+    cursor:           pointer;
+    transition:       color 0.2s, border-color 0.2s;
+}
+.btn-logout:hover { color: var(--error); border-color: var(--error); }
+
+
+.chat-layout {
+    display:     flex;
+    height:      calc(100vh - 49px);
+}
+
+
+.sidebar {
+    width:         260px;
+    background:    var(--bg-secondary);
+    border-right:  1px solid var(--border-color);
+    padding:       1.25rem 1rem;
+    display:       flex;
+    flex-direction: column;
+    gap:           0.75rem;
+    overflow-y:    auto;
+}
+
+.sidebar h3 { font-size: 0.9rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+
+.sidebar input[type="text"] { margin-bottom: 0; }
+
+.sidebar button {
+    padding:       0.55rem;
+    background:    var(--accent);
+    color:         #fff;
+    border:        none;
+    border-radius: var(--radius);
+    cursor:        pointer;
+    font-size:     0.9rem;
+    transition:    background 0.2s;
+}
+.sidebar button:hover { background: var(--accent-hover); }
+
+
+.status-badge {
+    padding:       0.35rem 0.7rem;
+    border-radius: 20px;
+    font-size:     0.8rem;
+    background:    var(--bg-input);
+    color:         var(--text-muted);
+    border:        1px solid var(--border-color);
+    text-align:    center;
+}
+.status-badge.connected   { color: var(--success); border-color: var(--success); }
+.status-badge.connecting  { color: var(--accent);  border-color: var(--accent);  }
+
+.fingerprint-section {
+    margin-top:  0.5rem;
+    font-size:   0.78rem;
+}
+.fingerprint-section .label { color: var(--text-muted); margin-bottom: 0.2rem; margin-top: 0.6rem; }
+.fingerprint-section code {
+    display:       block;
+    background:    var(--bg-input);
+    border:        1px solid var(--border-color);
+    border-radius: 4px;
+    padding:       0.3rem 0.5rem;
+    word-break:    break-all;
+    font-size:     0.72rem;
+    color:         var(--accent);
+}
+.fingerprint-section small { color: var(--text-muted); font-size: 0.72rem; margin-top: 0.5rem; display: block; }
+
+.chat-main {
+    flex:           1;
+    display:        flex;
+    flex-direction: column;
+    overflow:       hidden;
+}
+
+.messages-area {
+    flex:        1;
+    overflow-y:  auto;
+    padding:     1rem 1.25rem;
+    display:     flex;
+    flex-direction: column;
+    gap:         0.6rem;
+}
+
+.message-bubble {
+    max-width:     70%;
+    padding:       0.55rem 0.85rem;
+    border-radius: var(--radius);
+    font-size:     0.92rem;
+    line-height:   1.45;
+}
+.message-bubble.sent {
+    align-self:  flex-end;
+    background:  var(--accent);
+    color:       #fff;
+}
+.message-bubble.received {
+    align-self:  flex-start;
+    background:  var(--bg-secondary);
+    border:      1px solid var(--border-color);
+    color:       var(--text-primary);
+}
+.message-bubble .sender { font-size: 0.75rem; opacity: 0.75; margin-bottom: 0.2rem; }
+
+.system-msg {
+    text-align:  center;
+    color:       var(--text-muted);
+    font-size:   0.82rem;
+    font-style:  italic;
+    padding:     0.5rem;
+}
+
+.input-bar {
+    display:       flex;
+    gap:           0.5rem;
+    padding:       0.75rem 1.25rem;
+    border-top:    1px solid var(--border-color);
+    background:    var(--bg-secondary);
+}
+
+.input-bar input[type="text"] {
+    flex:          1;
+    margin-bottom: 0;
+}
+
+#send-btn {
+    padding:       0.6rem 1.2rem;
+    background:    var(--accent);
+    color:         #fff;
+    border:        none;
+    border-radius: var(--radius);
+    cursor:        pointer;
+    font-size:     0.95rem;
+    transition:    background 0.2s;
+}
+#send-btn:hover    { background: var(--accent-hover); }
+#send-btn:disabled { background: var(--bg-input); color: var(--text-muted); cursor: not-allowed; }
