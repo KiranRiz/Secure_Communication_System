@@ -38,5 +38,92 @@
 
     </div>
 
+    <script>
+        // Show either login or register form, hide the other
+        function showTab(tab) {
+            document.getElementById('login-form').style.display    = (tab === 'login')    ? 'block' : 'none';
+            document.getElementById('register-form').style.display = (tab === 'register') ? 'block' : 'none';
+        }
+
+        // Display a status message (success or error) below the form
+        function showMessage(msg, type) {
+            const el = document.getElementById('message');
+            el.textContent = msg;
+            el.style.color = (type === 'error') ? 'red' : 'green';
+        }
+
+        // Send login credentials to the Flask backend (/api/login)
+        // On success, redirect to the chat page with the username in the URL
+        async function handleLogin() {
+            const username = document.getElementById('login-username').value.trim();
+            const password = document.getElementById('login-password').value;
+
+            if (!username || !password) {
+                showMessage('Please fill in all fields', 'error');
+                return;
+            }
+
+            try {
+                const res  = await fetch('/api/login', {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    showMessage('Login successful!', 'success');
+                    // Small delay so the user sees the success message
+                    setTimeout(() => {
+                        window.location.href = `/chat?username=${username}`;
+                    }, 800);
+                } else {
+                    showMessage(data.message || 'Login failed', 'error');
+                }
+            } catch (e) {
+                showMessage('Cannot reach server', 'error');
+            }
+        }
+
+        // Send registration details to the Flask backend (/api/register)
+        // Validates passwords match and minimum length before sending
+        async function handleRegister() {
+            const username = document.getElementById('reg-username').value.trim();
+            const password = document.getElementById('reg-password').value;
+            const confirm  = document.getElementById('reg-confirm').value;
+
+            if (!username || !password) {
+                showMessage('Please fill in all fields', 'error');
+                return;
+            }
+            if (password !== confirm) {
+                showMessage('Passwords do not match', 'error');
+                return;
+            }
+            if (password.length < 6) {
+                showMessage('Password must be at least 6 characters', 'error');
+                return;
+            }
+
+            try {
+                const res  = await fetch('/api/register', {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    showMessage('Account created! Please login.', 'success');
+                    setTimeout(() => showTab('login'), 1000);
+                } else {
+                    showMessage(data.message || 'Registration failed', 'error');
+                }
+            } catch (e) {
+                showMessage('Cannot reach server', 'error');
+            }
+        }
+    </script>
+
 </body>
 </html>
