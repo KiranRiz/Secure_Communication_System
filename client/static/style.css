@@ -1,0 +1,128 @@
+/* style.css — Secure Chat UI */
+/* Author: Kiran */
+
+/* ── CSS Variables (colour palette & spacing) ─────────────────────────── */
+:root {
+    --bg-primary:    #0d1117;   /* dark page background */
+    --bg-secondary:  #161b22;   /* card / panel background */
+    --bg-input:      #21262d;   /* input field background */
+    --border-color:  #30363d;   /* subtle border */
+    --accent:        #58a6ff;   /* blue highlight / button */
+    --accent-hover:  #1f6feb;   /* button hover */
+    --text-primary:  #e6edf3;   /* main white text */
+    --text-muted:    #8b949e;   /* secondary grey text */
+    --success:       #3fb950;   /* green for success messages */
+    --error:         #f85149;   /* red for error messages */
+    --radius:        8px;         /* border radius used throughout */
+}
+
+/* ── Global Reset ─────────────────────────────────────────────────────── */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin:  0;
+    padding: 0;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background-color: var(--bg-primary);
+    color:            var(--text-primary);
+    min-height:       100vh;
+    display:          flex;
+    align-items:      center;
+    justify-content:  center;
+}
+
+/* ── Auth Page (Login / Register card) ───────────────────────────────── */
+.auth-container {
+    background:    var(--bg-secondary);
+    border:        1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding:       2rem;
+    width:         100%;
+    max-width:     400px;
+    text-align:    center;
+}
+
+.auth-container h1 {
+    font-size:     1.8rem;
+    margin-bottom: 0.25rem;
+    color:         var(--accent);
+}
+
+.auth-container p {
+    color:         var(--text-muted);
+    font-size:     0.85rem;
+    margin-bottom: 1.5rem;
+}
+
+/* ── Tab buttons (Login | Register) ──────────────────────────────────── */
+.tabs {
+    display:       flex;
+    gap:           0.5rem;
+    margin-bottom: 1.25rem;
+}
+
+.tabs button {
+    flex:          1;
+    padding:       0.5rem;
+    background:    var(--bg-input);
+    color:         var(--text-muted);
+    border:        1px solid var(--border-color);
+    border-radius: var(--radius);
+    cursor:        pointer;
+    font-size:     0.9rem;
+    transition:    background 0.2s, color 0.2s;
+}
+
+.tabs button.active,
+.tabs button:hover {
+    background:   var(--accent);
+    color:        #fff;
+    border-color: var(--accent);
+}
+
+/* ── Input fields ─────────────────────────────────────────────────────── */
+input[type="text"],
+input[type="password"] {
+    width:         100%;
+    padding:       0.65rem 0.9rem;
+    margin-bottom: 0.75rem;
+    background:    var(--bg-input);
+    color:         var(--text-primary);
+    border:        1px solid var(--border-color);
+    border-radius: var(--radius);
+    font-size:     0.95rem;
+    outline:       none;
+    transition:    border-color 0.2s;
+}
+
+input[type="text"]:focus,
+input[type="password"]:focus {
+    border-color: var(--accent);
+}
+
+/* ── Primary action button ────────────────────────────────────────────── */
+.auth-container button[onclick^="handle"] {
+    width:         100%;
+    padding:       0.7rem;
+    margin-top:    0.25rem;
+    background:    var(--accent);
+    color:         #fff;
+    border:        none;
+    border-radius: var(--radius);
+    font-size:     1rem;
+    cursor:        pointer;
+    transition:    background 0.2s;
+}
+
+.auth-container button[onclick^="handle"]:hover {
+    background: var(--accent-hover);
+}
+
+/* ── Status message (success / error) ────────────────────────────────── */
+#message {
+    margin-top: 0.9rem;
+    font-size:  0.88rem;
+    min-height: 1.2rem;
+}
