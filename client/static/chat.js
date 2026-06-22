@@ -24,7 +24,6 @@ function hexToBuf(hex) {
 }
 
 // Generate a short fingerprint from raw public key bytes using SHA-256
-// Used to verify keys out-of-band and detect MITM attacks
 async function makeFingerprint(rawKeyBytes) {
     const hash = await crypto.subtle.digest('SHA-256', rawKeyBytes);
     return bufToHex(hash).substring(0, 32).toUpperCase().match(/.{4}/g).join('-');
@@ -62,3 +61,38 @@ function setInputEnabled(enabled) {
     document.getElementById('message-input').disabled = !enabled;
     document.getElementById('send-btn').disabled       = !enabled;
 }
+
+// Socket.IO connection and messaging logic
+// Connect to the relay server and register our username
+function initSocket() {
+    socket = io(SERVER_URL);
+    socket.on('connect', () => {
+        socket.emit('join', { username: USERNAME });
+        appendSystem('Connected to server as ' + USERNAME);
+    });
+
+    socket.on('disconnect', () => {
+        appendSystem('Disconnected from server');
+        setStatus('Not connected');
+        setInputEnabled(false);
+    });
+
+    // Peer has sent us their public key complete the key exchange
+    socket.on('key_exchange', async (data) => {
+        peerName = data.from;
+        appendSystem(peerName + ' connected — completing key exchange...');
+        setStatus('Connecting...', 'connecting');
+        await completeKeyExchange(data.public_key);
+    });
+
+    // Relay server forwarded an encrypted message from our peer
+    socket.on('receive_message', async (data) => {
+        try {
+            const plaintext = await decryptMessage(data.ciphertext, data.nonce);
+            appendMessage(data.from, plaintext, false);
+        } catch (e) {
+            appendSystem('[Could not decrypt message — possible tampering]');
+        }
+    });
+}
+initSocket();
