@@ -3,52 +3,63 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Secure Chat</title>
+    <title>SecureChat</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body class="chat-page">
 
-    <!-- ── Top navigation bar ── -->
+    <!-- Top navigation bar -->
     <header class="navbar">
-        <span class="logo">🔐 SecureChat</span>
+        <span class="logo">&#128274; SecureChat</span>
+        <div class="nav-center">
+            <span class="nav-encrypted">&#128737; All messages are end-to-end encrypted</span>
+        </div>
         <span class="nav-user">Logged in as: <strong>{{ username }}</strong></span>
         <a href="/" class="btn-logout">Logout</a>
     </header>
 
     <div class="chat-layout">
 
-        <!-- ── Left sidebar: key exchange panel ── -->
+        <!-- Left sidebar -->
         <aside class="sidebar">
             <h3>Connect to User</h3>
 
-            <!-- Step 1: enter peer username and start key exchange -->
-            <input type="text" id="peer-username" placeholder="Peer username">
-            <button onclick="startKeyExchange()">Connect</button>
+            <input type="text" id="peer-username" placeholder="Enter username...">
+            <button onclick="startKeyExchange()">&#128279; Connect</button>
 
-            <!-- Step 2: shows current connection status -->
             <div id="connection-status" class="status-badge">Not connected</div>
 
-            <!-- Step 3: key fingerprint for MITM verification -->
-            <div class="fingerprint-section">
-                <p class="label">Your Key Fingerprint</p>
-                <code id="my-fingerprint">--</code>
-
-                <p class="label">Peer Fingerprint</p>
-                <code id="peer-fingerprint">--</code>
-
-                <small>Verify fingerprints match out-of-band to prevent MITM attacks</small>
+            <!-- Collapsible security section — hidden by default -->
+            <div class="security-panel">
+                <button class="security-toggle" onclick="toggleSecurity()">
+                    <span>&#128737; Verify Security</span>
+                    <span id="toggle-arrow">&#9660;</span>
+                </button>
+                <div id="security-details" style="display:none">
+                    <p class="security-hint">
+                        Compare these codes with your contact to confirm no one is intercepting your messages.
+                    </p>
+                    <div class="fp-row">
+                        <span class="fp-label">Your code</span>
+                        <code id="my-fingerprint">Generating...</code>
+                    </div>
+                    <div class="fp-row">
+                        <span class="fp-label">Their code</span>
+                        <code id="peer-fingerprint">Not connected</code>
+                    </div>
+                    <div class="fp-status" id="fp-status"></div>
+                </div>
             </div>
         </aside>
 
-        <!-- ── Main chat area ── -->
+        <!-- Main chat area -->
         <main class="chat-main">
-
-            <!-- Message history -->
             <div id="messages" class="messages-area">
-                <div class="system-msg">Connect to a peer to start encrypted chat</div>
+                <div class="system-msg">Connect to a user to start a secure conversation</div>
             </div>
 
-            <!-- Message input bar -->
             <div class="input-bar">
                 <input
                     type="text"
@@ -59,21 +70,23 @@
                 >
                 <button id="send-btn" onclick="sendMessage()" disabled>Send</button>
             </div>
-
         </main>
 
     </div>
 
-    <!-- Socket.IO client library (served by the relay server) -->
     <script src="{{ server_url }}/socket.io/socket.io.js"></script>
-
-    <!-- Pass Flask template variables into JavaScript -->
     <script>
         const USERNAME   = "{{ username }}";
         const SERVER_URL = "{{ server_url }}";
-    </script>
 
-    <!-- Encryption and messaging logic -->
+        function toggleSecurity() {
+            const panel = document.getElementById('security-details');
+            const arrow = document.getElementById('toggle-arrow');
+            const open  = panel.style.display === 'none';
+            panel.style.display = open ? 'block' : 'none';
+            arrow.textContent   = open ? '▲' : '▼';
+        }
+    </script>
     <script src="/static/chat.js"></script>
 
 </body>
