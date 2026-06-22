@@ -95,7 +95,41 @@ function initSocket() {
         }
     });
 }
-initSocket();
+// Check if running in demo mode (no server needed)
+const IS_DEMO = new URLSearchParams(window.location.search).get('demo') === '1';
+
+if (IS_DEMO) {
+    loadDemoMode();
+} else {
+    initSocket();
+}
+
+// TODO: Remove demo mode when server integration is complete
+function loadDemoMode() {
+    peerName = 'Alice';
+    setStatus('Demo Mode — Connected to Alice', 'connected');
+    setInputEnabled(true);
+
+    appendSystem('Demo mode active — server integration pending');
+    appendMessage('Alice', 'Hey! Can you see my message?', false);
+    appendMessage(USERNAME, 'Yes! End-to-end encryption is working.', true);
+    appendMessage('Alice', 'Great — the server only sees encrypted ciphertext, never plaintext.', false);
+    appendMessage(USERNAME, 'Exactly. AES-256-GCM with ECDH key exchange.', true);
+    appendMessage('Alice', 'And the fingerprints confirm no MITM attack.', false);
+
+    document.getElementById('my-fingerprint').textContent  = 'A1B2-C3D4-E5F6-G7H8';
+    document.getElementById('peer-fingerprint').textContent = 'X9Y8-Z7W6-V5U4-T3S2';
+
+    // In demo mode, send button just shows the message locally
+    document.getElementById('send-btn').onclick = function () {
+        const input = document.getElementById('message-input');
+        const text  = input.value.trim();
+        if (!text) return;
+        appendMessage(USERNAME, text, true);
+        input.value = '';
+        setTimeout(() => appendMessage('Alice', '(Demo: encrypted reply would appear here)', false), 800);
+    };
+}
 
 //ECDH Key Generation and AES Key Derivation
 
