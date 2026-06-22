@@ -97,15 +97,15 @@ function initSocket() {
 }
 initSocket();
 
-// ── ECDH Key Generation ──────────────────────────────────────────────────────
+//ECDH Key Generation and AES Key Derivation
 
 // Generate our ECDH P-256 key pair when the page loads.
 // The public key is shared with the peer; the private key never leaves the browser.
 async function generateMyKeys() {
     myKeyPair = await crypto.subtle.generateKey(
         { name: 'ECDH', namedCurve: 'P-256' },
-        true,                        // exportable so we can send the public key
-        ['deriveKey']                // private key used only to derive shared AES key
+        true,                        
+        ['deriveKey']                
     );
 
     // Export public key as raw bytes so we can send it as a hex string
@@ -143,8 +143,8 @@ async function completeKeyExchange(peerPublicHex) {
         'raw',
         peerRaw,
         { name: 'ECDH', namedCurve: 'P-256' },
-        false,          // peer public key does not need to be exportable
-        []              // no usages — only used in deriveKey below
+        false,          
+        []             
     );
 
     // Derive a 256-bit AES-GCM key from the ECDH shared secret
@@ -152,7 +152,7 @@ async function completeKeyExchange(peerPublicHex) {
         { name: 'ECDH', public: peerCrypto },
         myKeyPair.privateKey,
         { name: 'AES-GCM', length: 256 },
-        false,                          // AES key is not exportable
+        false,                          
         ['encrypt', 'decrypt']
     );
 
@@ -165,5 +165,63 @@ async function completeKeyExchange(peerPublicHex) {
     setInputEnabled(true);
 }
 
-// Generate keys immediately when page loads
 generateMyKeys();
+
+// AES-256-GCM Encrypt / Decrypt 
+// Encrypt a plaintext string with our shared AES key.
+// Returns { ciphertext: hex, nonce: hex }
+async function encryptMessage(plaintext) {
+    const iv      = crypto.getRandomValues(new Uint8Array(12));   // 96-bit random nonce
+    const encoded = new TextEncoder().encode(plaintext);
+
+    const cipherBuf = await crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv: iv },
+        aesKey,
+        encoded
+    );
+
+    return {
+        ciphertext: bufToHex(cipherBuf),
+        nonce:      bufToHex(iv.buffer)
+    };
+}
+
+// Decrypt a ciphertext received from the peer.
+// Returns the plaintext string.
+async function decryptMessage(ciphertextHex, nonceHex) {
+    const cipherBuf = hexToBuf(ciphertextHex);
+    const iv        = new Uint8Array(hexToBuf(nonceHex));
+
+    const plainBuf  = await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv: iv },
+        aesKey,
+        cipherBuf
+    );
+
+    return new TextDecoder().decode(plainBuf);
+}
+
+// Send Message
+
+// Called when the user presses Send or hits Enter.
+// Encrypts the message locally, then sends ciphertext to the relay server.
+// The server never sees the plaintext — only the hex-encoded ciphertext.
+async function sendMessage() {
+    const input = document.getElementById('message-input');
+    const text  = input.value.trim();
+    if (!text || !aesKey || !peerName) return;
+
+    try {
+        const { ciphertext, nonce } = await encryptMessage(text);
+
+        socket.emit('send_message', {
+            target:     peerName,
+            ciphertext: ciphertext,
+            nonce:      nonce
+        });
+        appendMessage(USERNAME, text, true);
+        input.value = '';
+    } catch (e) {
+        appendSystem('[Encryption failed — message not sent]');
+    }
+}
