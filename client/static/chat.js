@@ -96,3 +96,74 @@ function initSocket() {
     });
 }
 initSocket();
+
+// ── ECDH Key Generation ──────────────────────────────────────────────────────
+
+// Generate our ECDH P-256 key pair when the page loads.
+// The public key is shared with the peer; the private key never leaves the browser.
+async function generateMyKeys() {
+    myKeyPair = await crypto.subtle.generateKey(
+        { name: 'ECDH', namedCurve: 'P-256' },
+        true,                        // exportable so we can send the public key
+        ['deriveKey']                // private key used only to derive shared AES key
+    );
+
+    // Export public key as raw bytes so we can send it as a hex string
+    const rawBuf    = await crypto.subtle.exportKey('raw', myKeyPair.publicKey);
+    myPublicRaw     = new Uint8Array(rawBuf);
+
+    // Show our own fingerprint in the sidebar so the peer can verify it
+    const fp = await makeFingerprint(myPublicRaw);
+    document.getElementById('my-fingerprint').textContent = fp;
+}
+
+// Called when the user clicks "Connect" in the sidebar.
+// Sends our public key to the peer through the relay server.
+async function startKeyExchange() {
+    const target = document.getElementById('peer-username').value.trim();
+    if (!target) { alert('Enter a peer username'); return; }
+    if (!myPublicRaw) { alert('Keys not ready yet, please wait'); return; }
+
+    peerName = target;
+    setStatus('Connecting...', 'connecting');
+    appendSystem('Sending public key to ' + target + '...');
+
+    socket.emit('key_exchange', {
+        target:     target,
+        public_key: bufToHex(myPublicRaw.buffer)
+    });
+}
+
+// Called when we receive the peer's public key via the 'key_exchange' socket event.
+// Imports the peer key and derives our shared AES-256-GCM key.
+async function completeKeyExchange(peerPublicHex) {
+    // Import peer's raw public key into Web Crypto
+    const peerRaw    = new Uint8Array(hexToBuf(peerPublicHex));
+    const peerCrypto = await crypto.subtle.importKey(
+        'raw',
+        peerRaw,
+        { name: 'ECDH', namedCurve: 'P-256' },
+        false,          // peer public key does not need to be exportable
+        []              // no usages — only used in deriveKey below
+    );
+
+    // Derive a 256-bit AES-GCM key from the ECDH shared secret
+    aesKey = await crypto.subtle.deriveKey(
+        { name: 'ECDH', public: peerCrypto },
+        myKeyPair.privateKey,
+        { name: 'AES-GCM', length: 256 },
+        false,                          // AES key is not exportable
+        ['encrypt', 'decrypt']
+    );
+
+    // Show peer fingerprint so user can verify out-of-band (anti-MITM)
+    const fp = await makeFingerprint(peerRaw);
+    document.getElementById('peer-fingerprint').textContent = fp;
+
+    setStatus('Connected to ' + peerName, 'connected');
+    appendSystem('Key exchange complete — chat is end-to-end encrypted');
+    setInputEnabled(true);
+}
+
+// Generate keys immediately when page loads
+generateMyKeys();
