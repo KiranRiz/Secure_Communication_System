@@ -1,261 +1,345 @@
-// Handles ECDH key exchange, AES-256-GCM encryption, and Socket.IO messaging
+// chat.js — Author: Kiran
+// Purpose: Client-side encryption and real-time messaging
+// Fix: Proper ECDH key exchange — both parties must have
+//      uploaded keys before AES key derivation happens
 
-// State variables
-let socket       = null;   // Socket.IO connection to the relay server
-let myKeyPair    = null;   // Our ECDH key pair {publicKey, privateKey}
-let myPublicRaw  = null;   // Our public key as Uint8Array (to share with peer)
-let aesKey       = null;   // Derived AES-256-GCM key (after key exchange)
-let peerName     = null;   // Username of the person we are chatting with
+// ── State ──
+let socket = null;
+let currentRecipient = null;
+let aesKey = null;
+let myKeyPair = null;       // Store key pair permanently for session
+let myPublicKeyHex = null;  // Store our public key hex
 
-// Utility: convert between ArrayBuffer and hex strings
+// ── Connect to server via Socket.IO ──
+function initSocket() {
+    console.log("Connecting to server:", SERVER_URL);
 
-function bufToHex(buffer) {
-    return Array.from(new Uint8Array(buffer))
-        .map(b => b.toString(16).padStart(2, '0'))
-        .join('');
+    socket = io(SERVER_URL, {
+        transports: ['websocket', 'polling'],
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000
+    });
+
+    socket.on('connect', () => {
+        console.log("Socket connected:", socket.id);
+        document.getElementById('status-dot').textContent =
+            '🟢 Connected';
+        socket.emit('join', {username: CURRENT_USER});
+
+        // Upload our key as soon as we connect
+        uploadMyKey();
+    });
+
+    socket.on('connect_error', (err) => {
+        console.error("Connection error:", err);
+        document.getElementById('status-dot').textContent =
+            '🔴 Connection Failed';
+    });
+
+    socket.on('disconnect', () => {
+        document.getElementById('status-dot').textContent =
+            '🔴 Disconnected';
+    });
+
+    socket.on('status', (data) => {
+        addSystemMessage(data.message);
+    });
+
+    // Receive encrypted message from server
+    socket.on('receive_message', async (data) => {
+        if (!aesKey) {
+            addSystemMessage(
+                '⚠️ Message received but no key yet — ' +
+                'click Connect first'
+            );
+            return;
+        }
+        try {
+            const plaintext = await decryptMessage(
+                aesKey,
+                data.encrypted.nonce,
+                data.encrypted.ciphertext
+            );
+            addMessage(data.sender, plaintext, 'received');
+        } catch (e) {
+            console.error("Decryption error:", e);
+            addSystemMessage(
+                '⚠️ Decryption failed — please click Connect ' +
+                'again to refresh keys'
+            );
+        }
+    });
+
+    socket.on('error', (data) => {
+        addSystemMessage('❌ ' + data.message);
+    });
 }
 
-function hexToBuf(hex) {
-    const bytes = new Uint8Array(hex.length / 2);
-    for (let i = 0; i < hex.length; i += 2) {
-        bytes[i / 2] = parseInt(hex.substring(i, 2 + i), 16);
+// ── Generate key pair and upload to server on login ──
+async function uploadMyKey() {
+    try {
+        // Generate fresh ECDH key pair for this session
+        myKeyPair = await window.crypto.subtle.generateKey(
+            {name: 'ECDH', namedCurve: 'P-256'},
+            true,
+            ['deriveKey']
+        );
+
+        const myPublicKeyBuffer = await window.crypto.subtle.exportKey(
+            'raw', myKeyPair.publicKey
+        );
+        myPublicKeyHex = bufferToHex(myPublicKeyBuffer);
+
+        // Upload to server immediately
+        const res = await fetch(`${SERVER_URL}/store_key`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                username: CURRENT_USER,
+                public_key: myPublicKeyHex
+            })
+        });
+
+        if (res.ok) {
+            console.log("My public key uploaded to server");
+            addSystemMessage(
+                '🔑 Your key has been uploaded. ' +
+                'Enter recipient username and click Connect.'
+            );
+        }
+    } catch (e) {
+        console.error("Key upload error:", e);
+        addSystemMessage('❌ Failed to upload key: ' + e.message);
     }
-    return bytes.buffer;
 }
 
-// Generate a short fingerprint from raw public key bytes using SHA-256
-async function makeFingerprint(rawKeyBytes) {
-    const hash = await crypto.subtle.digest('SHA-256', rawKeyBytes);
-    return bufToHex(hash).substring(0, 32).toUpperCase().match(/.{4}/g).join('-');
+// ── ECDH Key Exchange — derive AES key with recipient ──
+async function startKeyExchange() {
+    const recipient =
+        document.getElementById('recipient-input').value.trim();
+
+    if (!recipient) {
+        alert('Enter recipient username');
+        return;
+    }
+    if (recipient === CURRENT_USER) {
+        alert('Cannot chat with yourself');
+        return;
+    }
+    if (!socket || !socket.connected) {
+        addSystemMessage('⏳ Not connected yet — please wait...');
+        return;
+    }
+    if (!myKeyPair || !myPublicKeyHex) {
+        addSystemMessage('⏳ Key not ready yet — please wait...');
+        await uploadMyKey();
+        return;
+    }
+
+    currentRecipient = recipient;
+    addSystemMessage(`🔄 Fetching ${recipient}'s key from server...`);
+
+    try {
+        // Fetch recipient's public key from server
+        const getRes = await fetch(
+            `${SERVER_URL}/get_key/${recipient}`
+        );
+        const data = await getRes.json();
+
+        if (!data.success) {
+            addSystemMessage(
+                `❌ "${recipient}" has not uploaded a key yet. ` +
+                `Make sure they are logged in and connected. ` +
+                `Retrying in 5 seconds...`
+            );
+            // Auto retry after 5 seconds
+            setTimeout(() => startKeyExchange(), 5000);
+            return;
+        }
+
+        // Derive shared AES-256 key using our private key
+        // + recipient's public key
+        const recipientPublicKeyBuffer = hexToBuffer(data.public_key);
+        const recipientPublicKey =
+            await window.crypto.subtle.importKey(
+                'raw',
+                recipientPublicKeyBuffer,
+                {name: 'ECDH', namedCurve: 'P-256'},
+                false,
+                []
+            );
+
+        aesKey = await window.crypto.subtle.deriveKey(
+            {name: 'ECDH', public: recipientPublicKey},
+            myKeyPair.privateKey,
+            {name: 'AES-GCM', length: 256},
+            false,
+            ['encrypt', 'decrypt']
+        );
+
+        console.log("AES key derived successfully");
+
+        // Show fingerprint for MITM verification
+        const fingerprint = formatFingerprint(myPublicKeyHex);
+        const fpBox = document.getElementById('fingerprint-display');
+        fpBox.style.display = 'block';
+        fpBox.innerHTML =
+            `🔑 Session established with <b>${recipient}</b><br>
+             Your key fingerprint:
+             <code>${fingerprint}</code><br>
+             <small>⚠️ Verify this fingerprint with
+             ${recipient} via phone/in-person to prevent
+             MITM attack</small>`;
+
+        // Enable messaging
+        document.getElementById('message-input').disabled = false;
+        document.getElementById('send-btn').disabled = false;
+        document.getElementById('key-panel').style.background =
+            '#0a2e1a';
+
+        addSystemMessage(
+            `✅ Encrypted session ready with ${recipient} — ` +
+            `you can now send messages`
+        );
+
+    } catch (e) {
+        console.error("Key exchange error:", e);
+        addSystemMessage('❌ Key exchange failed: ' + e.message);
+    }
 }
 
-// Add a chat bubble to the messages area
-function appendMessage(sender, text, isMine) {
-    const area = document.getElementById('messages');
-    const div  = document.createElement('div');
-    div.className = 'message-bubble ' + (isMine ? 'sent' : 'received');
-    div.innerHTML = `<div class="sender">${sender}</div><div>${text}</div>`;
+// ── Format fingerprint like SSH ──
+function formatFingerprint(publicKeyHex) {
+    const short = publicKeyHex.substring(0, 32);
+    return short.match(/.{1,4}/g).join(':');
+}
+
+// ── Encrypt message using AES-GCM ──
+async function encryptMessage(key, plaintext) {
+    const nonce = window.crypto.getRandomValues(new Uint8Array(12));
+    const encoded = new TextEncoder().encode(plaintext);
+    const ciphertext = await window.crypto.subtle.encrypt(
+        {name: 'AES-GCM', iv: nonce},
+        key,
+        encoded
+    );
+    return {
+        nonce: bufferToHex(nonce),
+        ciphertext: bufferToHex(ciphertext)
+    };
+}
+
+// ── Decrypt message using AES-GCM ──
+async function decryptMessage(key, nonceHex, ciphertextHex) {
+    const nonce = hexToBuffer(nonceHex);
+    const ciphertext = hexToBuffer(ciphertextHex);
+    const decrypted = await window.crypto.subtle.decrypt(
+        {name: 'AES-GCM', iv: nonce},
+        key,
+        ciphertext
+    );
+    return new TextDecoder().decode(decrypted);
+}
+
+// ── Send encrypted message ──
+async function sendMessage() {
+    const input = document.getElementById('message-input');
+    const text = input.value.trim();
+
+    if (!text) return;
+
+    if (!socket || !socket.connected) {
+        addSystemMessage('❌ Not connected to server');
+        return;
+    }
+    if (!aesKey) {
+        addSystemMessage(
+            '❌ No encryption key — click Connect first'
+        );
+        return;
+    }
+    if (!currentRecipient) {
+        addSystemMessage('❌ No recipient selected');
+        return;
+    }
+
+    try {
+        const encrypted = await encryptMessage(aesKey, text);
+        const msgId = generateUUID();
+
+        socket.emit('send_message', {
+            msg_id: msgId,
+            sender: CURRENT_USER,
+            recipient: currentRecipient,
+            encrypted: encrypted
+        });
+
+        addMessage('You', text, 'sent');
+        input.value = '';
+
+    } catch (e) {
+        addSystemMessage('❌ Send failed: ' + e.message);
+    }
+}
+
+// ── UI Helpers ──
+function addMessage(sender, text, type) {
+    const area = document.getElementById('messages-area');
+    const time = new Date().toLocaleTimeString([], {
+        hour: '2-digit', minute: '2-digit'
+    });
+    const div = document.createElement('div');
+    div.className = `message-bubble ${type}`;
+    div.innerHTML = `
+        <div class="sender">${sender}</div>
+        <div>${escapeHtml(text)}</div>
+        <div class="time">${time} 🔒</div>
+    `;
     area.appendChild(div);
     area.scrollTop = area.scrollHeight;
 }
 
-// Add a grey system message (e.g. "Connected to Alice")
-function appendSystem(text) {
-    const area = document.getElementById('messages');
-    const div  = document.createElement('div');
-    div.className   = 'system-msg';
+function addSystemMessage(text) {
+    const area = document.getElementById('messages-area');
+    const div = document.createElement('div');
+    div.className = 'system-msg';
     div.textContent = text;
     area.appendChild(div);
     area.scrollTop = area.scrollHeight;
 }
 
-// Update the connection status badge in the sidebar
-function setStatus(text, cssClass) {
-    const el = document.getElementById('connection-status');
-    el.textContent = text;
-    el.className   = 'status-badge ' + (cssClass || '');
+// Prevent XSS in messages
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.appendChild(document.createTextNode(text));
+    return div.innerHTML;
 }
 
-// Enable or disable the message input and send button
-function setInputEnabled(enabled) {
-    document.getElementById('message-input').disabled = !enabled;
-    document.getElementById('send-btn').disabled       = !enabled;
+function bufferToHex(buffer) {
+    return Array.from(new Uint8Array(buffer))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
 }
 
-// Socket.IO connection and messaging logic
-// Connect to the relay server and register our username
-function initSocket() {
-    socket = io(SERVER_URL);
-    socket.on('connect', () => {
-        socket.emit('join', { username: USERNAME });
-        appendSystem('Connected to server as ' + USERNAME);
-    });
-
-    socket.on('disconnect', () => {
-        appendSystem('Disconnected from server');
-        setStatus('Not connected');
-        setInputEnabled(false);
-    });
-
-    // Peer has sent us their public key complete the key exchange
-    socket.on('key_exchange', async (data) => {
-        peerName = data.from;
-        appendSystem(peerName + ' connected — completing key exchange...');
-        setStatus('Connecting...', 'connecting');
-        await completeKeyExchange(data.public_key);
-    });
-
-    // Relay server forwarded an encrypted message from our peer
-    socket.on('receive_message', async (data) => {
-        try {
-            const plaintext = await decryptMessage(data.ciphertext, data.nonce);
-            appendMessage(data.from, plaintext, false);
-        } catch (e) {
-            appendSystem('[Could not decrypt message — possible tampering]');
-        }
-    });
-}
-// Check if running in demo mode (no server needed)
-const IS_DEMO = new URLSearchParams(window.location.search).get('demo') === '1';
-
-if (IS_DEMO) {
-    loadDemoMode();
-} else {
-    initSocket();
-}
-
-// TODO: Remove demo mode when server integration is complete
-function loadDemoMode() {
-    peerName = 'Alice';
-    setStatus('Demo Mode — Connected to Alice', 'connected');
-    setInputEnabled(true);
-
-    appendSystem('Demo mode active — server integration pending');
-    appendMessage('Alice', 'Hey! Can you see my message?', false);
-    appendMessage(USERNAME, 'Yes! End-to-end encryption is working.', true);
-    appendMessage('Alice', 'Great — the server only sees encrypted ciphertext, never plaintext.', false);
-    appendMessage(USERNAME, 'Exactly. AES-256-GCM with ECDH key exchange.', true);
-    appendMessage('Alice', 'And the fingerprints confirm no MITM attack.', false);
-
-    document.getElementById('my-fingerprint').textContent  = 'A1B2-C3D4-E5F6-G7H8';
-    document.getElementById('peer-fingerprint').textContent = 'X9Y8-Z7W6-V5U4-T3S2';
-
-    // In demo mode, send button just shows the message locally
-    document.getElementById('send-btn').onclick = function () {
-        const input = document.getElementById('message-input');
-        const text  = input.value.trim();
-        if (!text) return;
-        appendMessage(USERNAME, text, true);
-        input.value = '';
-        setTimeout(() => appendMessage('Alice', '(Demo: encrypted reply would appear here)', false), 800);
-    };
-}
-
-//ECDH Key Generation and AES Key Derivation
-
-// Generate our ECDH P-256 key pair when the page loads.
-// The public key is shared with the peer; the private key never leaves the browser.
-async function generateMyKeys() {
-    myKeyPair = await crypto.subtle.generateKey(
-        { name: 'ECDH', namedCurve: 'P-256' },
-        true,                        
-        ['deriveKey']                
-    );
-
-    // Export public key as raw bytes so we can send it as a hex string
-    const rawBuf    = await crypto.subtle.exportKey('raw', myKeyPair.publicKey);
-    myPublicRaw     = new Uint8Array(rawBuf);
-
-    // Show our own fingerprint in the sidebar so the peer can verify it
-    const fp = await makeFingerprint(myPublicRaw);
-    document.getElementById('my-fingerprint').textContent = fp;
-}
-
-// Called when the user clicks "Connect" in the sidebar.
-// Sends our public key to the peer through the relay server.
-async function startKeyExchange() {
-    const target = document.getElementById('peer-username').value.trim();
-    if (!target) { alert('Enter a peer username'); return; }
-    if (!myPublicRaw) { alert('Keys not ready yet, please wait'); return; }
-
-    peerName = target;
-    setStatus('Connecting...', 'connecting');
-    appendSystem('Sending public key to ' + target + '...');
-
-    socket.emit('key_exchange', {
-        target:     target,
-        public_key: bufToHex(myPublicRaw.buffer)
-    });
-}
-
-// Called when we receive the peer's public key via the 'key_exchange' socket event.
-// Imports the peer key and derives our shared AES-256-GCM key.
-async function completeKeyExchange(peerPublicHex) {
-    // Import peer's raw public key into Web Crypto
-    const peerRaw    = new Uint8Array(hexToBuf(peerPublicHex));
-    const peerCrypto = await crypto.subtle.importKey(
-        'raw',
-        peerRaw,
-        { name: 'ECDH', namedCurve: 'P-256' },
-        false,          
-        []             
-    );
-
-    // Derive a 256-bit AES-GCM key from the ECDH shared secret
-    aesKey = await crypto.subtle.deriveKey(
-        { name: 'ECDH', public: peerCrypto },
-        myKeyPair.privateKey,
-        { name: 'AES-GCM', length: 256 },
-        false,                          
-        ['encrypt', 'decrypt']
-    );
-
-    // Show peer fingerprint so user can verify out-of-band (anti-MITM)
-    const fp = await makeFingerprint(peerRaw);
-    document.getElementById('peer-fingerprint').textContent = fp;
-
-    setStatus('Connected to ' + peerName, 'connected');
-    appendSystem('Key exchange complete — chat is end-to-end encrypted');
-    setInputEnabled(true);
-}
-
-generateMyKeys();
-
-// AES-256-GCM Encrypt / Decrypt 
-// Encrypt a plaintext string with our shared AES key.
-// Returns { ciphertext: hex, nonce: hex }
-async function encryptMessage(plaintext) {
-    const iv      = crypto.getRandomValues(new Uint8Array(12));   // 96-bit random nonce
-    const encoded = new TextEncoder().encode(plaintext);
-
-    const cipherBuf = await crypto.subtle.encrypt(
-        { name: 'AES-GCM', iv: iv },
-        aesKey,
-        encoded
-    );
-
-    return {
-        ciphertext: bufToHex(cipherBuf),
-        nonce:      bufToHex(iv.buffer)
-    };
-}
-
-// Decrypt a ciphertext received from the peer.
-// Returns the plaintext string.
-async function decryptMessage(ciphertextHex, nonceHex) {
-    const cipherBuf = hexToBuf(ciphertextHex);
-    const iv        = new Uint8Array(hexToBuf(nonceHex));
-
-    const plainBuf  = await crypto.subtle.decrypt(
-        { name: 'AES-GCM', iv: iv },
-        aesKey,
-        cipherBuf
-    );
-
-    return new TextDecoder().decode(plainBuf);
-}
-
-// Send Message
-
-// Called when the user presses Send or hits Enter.
-// Encrypts the message locally, then sends ciphertext to the relay server.
-// The server never sees the plaintext — only the hex-encoded ciphertext.
-async function sendMessage() {
-    const input = document.getElementById('message-input');
-    const text  = input.value.trim();
-    if (!text || !aesKey || !peerName) return;
-
-    try {
-        const { ciphertext, nonce } = await encryptMessage(text);
-
-        socket.emit('send_message', {
-            target:     peerName,
-            ciphertext: ciphertext,
-            nonce:      nonce
-        });
-        appendMessage(USERNAME, text, true);
-        input.value = '';
-    } catch (e) {
-        appendSystem('[Encryption failed — message not sent]');
+function hexToBuffer(hex) {
+    const bytes = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < hex.length; i += 2) {
+        bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
     }
+    return bytes.buffer;
 }
+
+function generateUUID() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(
+        /[xy]/g, c => {
+            const r = Math.random() * 16 | 0;
+            return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+        }
+    );
+}
+
+// ── Start on page load ──
+window.onload = () => {
+    initSocket();
+};
