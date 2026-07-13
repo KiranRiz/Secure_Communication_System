@@ -5,12 +5,14 @@
 
 from flask import Flask, request, jsonify
 from flask_socketio import SocketIO, emit, join_room
+from flask_cors import CORS
 from server.auth import AuthManager
 from server.replay_guard import ReplayGuard
 import uuid
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secure-chat-secret-key'
+CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 auth = AuthManager()
@@ -63,8 +65,11 @@ def get_key(username):
     key = auth.get_public_key(username)
     if key:
         return jsonify({"success": True, "public_key": key})
-    return jsonify({"success": False,
-                    "message": "Key not found"}), 404
+    return jsonify({
+        "success": False,
+        "message": f"User '{username}' has not uploaded a key yet. "
+                   f"Make sure they are logged in and have clicked Connect."
+    }), 404
 
 # ─────────────────────────────────────────
 # SOCKET.IO — Real-time messaging
@@ -84,13 +89,8 @@ def on_join(data):
     print(f"{username} joined")
     emit('status', {'message': f'Connected as {username}'})
 
-
 @socketio.on('send_message')
 def on_message(data):
-    """
-    Relay encrypted message to recipient.
-    Server only sees ciphertext — cannot read content.
-    """
     msg_id = data.get('msg_id')
     recipient = data.get('recipient')
     sender = data.get('sender')
@@ -98,17 +98,19 @@ def on_message(data):
 
     # Replay attack check
     if replay_guard.is_replay(msg_id):
+        print(f"🚨 REPLAY ATTACK DETECTED — blocked msg_id: {msg_id}")
         emit('error', {'message': 'Replay attack detected — blocked'})
         return
 
-    # Forward to recipient — server never decrypts
+    print(f"✅ New message accepted — msg_id: {msg_id}")
+    print(f"[RELAYED] {sender} → {recipient} | "
+          f"Ciphertext: {str(encrypted_payload)[:30]}...")
+
     emit('receive_message', {
         'sender': sender,
         'encrypted': encrypted_payload,
         'msg_id': msg_id
     }, room=recipient)
-    print(f"[RELAYED] {sender} → {recipient} | "
-          f"Ciphertext: {str(encrypted_payload)[:30]}...")
 
 
 @socketio.on('disconnect')
