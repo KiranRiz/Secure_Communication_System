@@ -1,0 +1,17 @@
+# Virtual Environment
+venv/
+
+# User data — never commit to GitHub
+users.json
+
+# Environment variables
+.env
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE
+.vscode/
+.idea/
