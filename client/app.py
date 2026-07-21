@@ -43,7 +43,11 @@ def register():
     try:
         response = http_requests.post(
             f"{SERVER_URL}/register",
-            json=data,
+            json={
+                "username": data.get("username"),
+                "password": data.get("password"),
+                "email": data.get("email", None)
+            },
             timeout=5
         )
 
@@ -54,8 +58,7 @@ def register():
             "success": False,
             "message": str(e)
         })
-
-
+        
 @app.route('/api/login', methods=['POST'])
 def login():
     """Forward login to main server"""
