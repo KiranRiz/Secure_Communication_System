@@ -1,159 +1,186 @@
-<!DOCTYPE html> 
-<html lang="en"> 
-<head> 
-    <meta charset="UTF-8"> 
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial
-scale=1.0"> 
-    <title>Secure Chat — Login</title> 
-    <link rel="stylesheet" href="/static/style.css"> 
-</head> 
-<body> 
-    <div class="auth-container"> 
- 
-        <!-- Logo --> 
-        <div class="logo"> 
-            🔐 SecureChat 
-        </div> 
-        <p class="tagline">End-to-End Encrypted Messaging</p> 
- 
-        <!-- Tabs --> 
-        <div class="tabs"> 
-            <button class="tab active" onclick="showTab('login')"> 
-                Login 
-            </button> 
-            <button class="tab" onclick="showTab('register')"> 
-                Register 
-            </button> 
-        </div> 
- 
-        <!-- Login Form --> 
-        <div id="login-form"> 
-            <input type="text" id="login-username" 
-                   placeholder="Username" class="input-field"> 
-            <input type="password" id="login-password" 
-                   placeholder="Password" class="input-field"> 
-            <button class="btn-primary" onclick="handleLogin()"> 
-                Login 
-            </button> 
-        </div> 
- 
-        <!-- Register Form --> 
-        <div id="register-form" style="display:none"> 
-            <input type="text" id="reg-username" 
-                   placeholder="Choose Username" class="input-field"> 
-            <input type="password" id="reg-password" 
-                   placeholder="Choose Password" class="input-field"> 
-            <input type="password" id="reg-confirm" 
-                   placeholder="Confirm Password" class="input-field"> 
-            <button class="btn-primary" onclick="handleRegister()"> 
-                Create Account 
-            </button> 
-        </div> 
- 
-        <!-- Message --> 
-        <div id="message" class="message"></div> 
- 
-        <!-- Encryption Info --> 
-        <div class="security-badge"> 
-            🛡️ AES-256-GCM Encrypted &nbsp;|&nbsp; 
-            🔑 ECDH Key Exchange &nbsp;|&nbsp; 
-            🚫 Zero Knowledge Server 
-        </div> 
- 
-    </div> 
- 
-    <script> 
-        function showTab(tab) { 
-            document.getElementById('login-form').style.display = 
-                tab === 'login' ? 'block' : 'none'; 
-            document.getElementById('register-form').style.display = 
-                tab === 'register' ? 'block' : 'none'; 
-            document.querySelectorAll('.tab').forEach((t, i) => { 
-                t.classList.toggle('active', 
-                    (tab === 'login' && i === 0) || 
-                    (tab === 'register' && i === 1)); 
-            }); 
-        } 
- 
-        function showMessage(msg, type) { 
-            const el = document.getElementById('message'); 
-            el.textContent = msg; 
-            el.className = 'message ' + type; 
-        } 
- 
-        async function handleLogin() { 
-            const username = 
-            document.getElementById('login-username').value.trim();
-            const password = 
-                document.getElementById('login-password').value; 
- 
-            if (!username || !password) { 
-                showMessage('Please fill all fields', 'error'); 
-                return; 
-            } 
- 
-            try { 
-                const res = await fetch('/api/login', { 
-                    method: 'POST', 
-                    headers: {'Content-Type': 'application/json'}, 
-                    body: JSON.stringify({username, password}) 
-                }); 
-                const data = await res.json(); 
- 
-                if (data.success) { 
-                    showMessage('Login successful!', 'success'); 
-                    setTimeout(() => { 
-                        window.location.href = 
-                            `/chat?username=${username}`; 
-                    }, 800); 
-                } else { 
-                    showMessage(data.message, 'error'); 
-                } 
-            } catch (e) { 
-                showMessage('Server not reachable', 'error'); 
-            } 
-        } 
- 
-        async function handleRegister() { 
-            const username = 
-                document.getElementById('reg-username').value.trim(); 
-            const password = 
-                document.getElementById('reg-password').value; 
-            const confirm = 
-                document.getElementById('reg-confirm').value; 
- 
-            if (!username || !password) { 
-                showMessage('Please fill all fields', 'error'); 
-                return; 
-            } 
-            if (password !== confirm) { 
-                showMessage('Passwords do not match', 'error'); 
-                return; 
-            } 
-            if (password.length < 6) { 
-                showMessage('Password min 6 characters', 'error'); 
-                return; 
-            } 
- 
-            try { 
-                const res = await fetch('/api/register', { 
-                    method: 'POST', 
-                    headers: {'Content-Type': 'application/json'}, 
-                    body: JSON.stringify({username, password}) 
-                }); 
-                const data = await res.json(); 
- 
-                if (data.success) { 
-                    showMessage('Registered! Please login.', 
-'success'); 
-                    setTimeout(() => showTab('login'), 1000); 
-                } else { 
-                    showMessage(data.message, 'error'); 
-                } 
-            } catch (e) { 
-                showMessage('Server not reachable', 'error'); 
-            } 
-        } 
-    </script> 
-</body> 
-</html> 
+scale=1.0">
+    <title>Secure Chat — Login</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+    <div class="auth-container">
+
+        <!-- Logo -->
+        <div class="logo">
+            🔐 SecureChat
+        </div>
+        <p class="tagline">End-to-End Encrypted Messaging</p>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('login')">
+                Login
+            </button>
+            <button class="tab" onclick="showTab('register')">
+                Register
+            </button>
+        </div>
+
+        <!-- Login Form -->
+        <div id="login-form">
+            <input type="text" id="login-username" placeholder="Username" class="input-field">
+            <input type="password" id="login-password" placeholder="Password" class="input-field">
+            <button class="btn-primary" onclick="handleLogin()">
+                Login
+            </button>
+        </div>
+
+        <div id="register-form" style="display:none">
+
+            <input type="text" id="reg-username" placeholder="Choose Username" class="input-field">
+
+            <input type="email" id="reg-email" placeholder="Email Address (for identity)" class="input-field">
+
+            <input type="password" id="reg-password" placeholder="Choose Password (min 6 chars)" class="input-field">
+
+            <input type="password" id="reg-confirm" placeholder="Confirm Password" class="input-field">
+
+            <button class="btn-primary" onclick="handleRegister()">
+                Create Account
+            </button>
+
+            <p style="color:#555;font-size:0.8rem;margin-top:12px;">
+                📧 Email is used for identity verification only.
+            </p>
+
+        </div>
+
+        <!-- Message -->
+        <div id="message" class="message"></div>
+
+        <!-- Encryption Info -->
+        <div class="security-badge">
+            🛡️ AES-256-GCM Encrypted &nbsp;|&nbsp;
+            🔑 ECDH Key Exchange &nbsp;|&nbsp;
+            🚫 Zero Knowledge Server
+        </div>
+
+    </div>
+
+    <script>
+        function showTab(tab) {
+            document.getElementById('login-form').style.display =
+                tab === 'login' ? 'block' : 'none';
+            document.getElementById('register-form').style.display =
+                tab === 'register' ? 'block' : 'none';
+            document.querySelectorAll('.tab').forEach((t, i) => {
+                t.classList.toggle('active',
+                    (tab === 'login' && i === 0) ||
+                    (tab === 'register' && i === 1));
+            });
+        }
+
+        function showMessage(msg, type) {
+            const el = document.getElementById('message');
+            el.textContent = msg;
+            el.className = 'message ' + type;
+        }
+
+        async function handleLogin() {
+            const username =
+                document.getElementById('login-username').value.trim();
+            const password =
+                document.getElementById('login-password').value;
+
+            if (!username || !password) {
+                showMessage('Please fill all fields', 'error');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    showMessage('Login successful!', 'success');
+                    setTimeout(() => {
+                        window.location.href =
+                            `/chat?username=${username}`;
+                    }, 800);
+                } else {
+                    showMessage(data.message, 'error');
+                }
+            } catch (e) {
+                showMessage('Server not reachable', 'error');
+            }
+        }
+
+        async function handleRegister() {
+
+            const username =
+                document.getElementById('reg-username').value.trim();
+
+            const email =
+                document.getElementById('reg-email').value.trim();
+
+            const password =
+                document.getElementById('reg-password').value;
+
+            const confirm =
+                document.getElementById('reg-confirm').value;
+
+            if (!username || !email || !password || !confirm) {
+                showMessage('Please fill all required fields', 'error');
+                return;
+            }
+
+            if (password !== confirm) {
+                showMessage('Passwords do not match', 'error');
+                return;
+            }
+
+            if (password.length < 6) {
+                showMessage('Password must be at least 6 characters', 'error');
+                return;
+            }
+
+            try {
+
+                const res = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username,
+                        email,
+                        password
+                    })
+                });
+
+                const data = await res.json();
+
+                if (data.success) {
+
+                    showMessage('✅ Registered successfully! Please login.', 'success');
+
+                    setTimeout(() => {
+                        showTab('login');
+                    }, 1200);
+
+                } else {
+                    showMessage(data.message, 'error');
+                }
+
+            } catch (e) {
+                showMessage('Server not reachable', 'error');
+            }
+        }
+    </script>
+</body>
+
+</html>
