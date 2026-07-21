@@ -31,10 +31,11 @@ def register():
     data = request.json
     username = data.get('username')
     password = data.get('password')
+    email = data.get('email')
     if not username or not password:
         return jsonify({"success": False,
                         "message": "Username and password required"}), 400
-    result = auth.register(username, password)
+    result = auth.register(username, password, email)
     return jsonify(result)
 
 
