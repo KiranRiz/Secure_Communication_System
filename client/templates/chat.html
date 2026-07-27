@@ -1,73 +1,172 @@
-<!-- Author: Kiran --> 
-<!DOCTYPE html> 
-<html lang="en"> 
-<head> 
-    <meta charset="UTF-8"> 
-    <meta name="viewport" content="width=device-width, initial
-scale=1.0"> 
-    <title>SecureChat</title> 
-    <link rel="stylesheet" href="/static/style.css"> 
-    <script 
-src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.
-min.js"></script> 
-</head> 
-<body> 
-    <div class="chat-container"> 
- 
-        <!-- Header --> 
-        <div class="chat-header"> 
-            <span>🔐 SecureChat</span> 
-            <span class="username-badge">👤 {{ username }}</span> 
-            <span id="status-dot" class="status-dot">🔴 
-Connecting...</span> 
-        </div> 
- 
-        <!-- Key Exchange Panel --> 
-        <div class="key-panel" id="key-panel"> 
-            <h3>🔑 Key Exchange Required</h3> 
-            <p>Enter recipient username to establish encrypted 
-session:</p> 
-            <div class="key-input-row"> 
-                <input type="text" id="recipient-input" 
-                       placeholder="Recipient username" 
-                       class="input-field small"> 
-                <button class="btn-primary small" 
-                        onclick="startKeyExchange()"> 
-                    Connect 
-                </button> 
-            </div> 
-            <div id="fingerprint-display" class="fingerprint-box" 
-                 style="display:none"> 
-            </div> 
-        </div> 
- 
-        <!-- Messages Area --> 
-        <div class="messages-area" id="messages-area"> 
-            <div class="system-msg"> 
-                🔐 Messages are end-to-end encrypted. 
-                Server cannot read your messages. 
-            </div> 
-        </div> 
- 
-        <!-- Input Area --> 
-        <div class="input-area"> 
-            <input type="text" id="message-input" 
-                   placeholder="Type encrypted message..." 
-                   class="input-field" disabled 
-                   onkeypress="if(event.key==='Enter') sendMessage()"> 
-            <button class="btn-send" id="send-btn" 
-                    onclick="sendMessage()" disabled> 
-                Send 🔒 
-            </button> 
-        </div> 
- 
-    </div> 
- 
-    <script src="/static/chat.js"></script> 
-    <script> 
-        // Pass Flask variables to JavaScript 
-        const CURRENT_USER = "{{ username }}"; 
-        const SERVER_URL = "{{ server_url }}"; 
-    </script> 
-</body> 
-</html> 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SecureChat</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+</head>
+<body class="chat-page">
+    <!-- Initial app connect overlay -->
+    <div class="app-loader" id="app-loader">
+        <div class="app-loader-card">
+            <div class="spinner lg"></div>
+            <p>Connecting SecureChat...</p>
+        </div>
+    </div>
+
+    <div class="app-layout">
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-profile" id="sidebar-profile">
+                <div class="avatar" id="my-avatar">?</div>
+                <div class="sidebar-profile-meta">
+                    <div class="sidebar-name" id="my-display-name">{{ username }}</div>
+                    <div class="sidebar-handle" id="my-username">@{{ username }}</div>
+                </div>
+                <div class="sidebar-actions">
+                    <a class="icon-btn" href="/profile-page?username={{ username }}" title="Account settings">⚙</a>
+                    <button class="icon-btn" type="button" onclick="openLogoutModal()" title="Logout">⎋</button>
+                </div>
+            </div>
+
+            <!-- Profile skeleton -->
+            <div class="sidebar-profile skeleton-block" id="profile-skeleton" hidden>
+                <div class="skeleton skeleton-avatar"></div>
+                <div class="skeleton-lines">
+                    <div class="skeleton skeleton-line w-60"></div>
+                    <div class="skeleton skeleton-line w-40"></div>
+                </div>
+            </div>
+
+            <div class="sidebar-search">
+                <input type="text" id="chat-search" class="input-field" placeholder="Search chats"
+                       oninput="filterChatList()">
+            </div>
+
+            <div class="new-chat-box">
+                <input type="text" id="new-chat-user" class="input-field" placeholder="Start chat with username">
+                <button type="button" class="btn-primary small" id="new-chat-btn" onclick="startNewChat()">Chat</button>
+            </div>
+
+            <div class="chat-list-header">
+                Chats
+                <span class="inline-spinner" id="chat-list-spinner" hidden></span>
+            </div>
+            <div class="chat-list" id="chat-list">
+                <div class="chat-list-skeleton" id="chat-list-skeleton">
+                    <div class="chat-item-skeleton"><div class="skeleton skeleton-avatar"></div><div class="skeleton-lines"><div class="skeleton skeleton-line w-70"></div><div class="skeleton skeleton-line w-50"></div></div></div>
+                    <div class="chat-item-skeleton"><div class="skeleton skeleton-avatar"></div><div class="skeleton-lines"><div class="skeleton skeleton-line w-55"></div><div class="skeleton skeleton-line w-40"></div></div></div>
+                    <div class="chat-item-skeleton"><div class="skeleton skeleton-avatar"></div><div class="skeleton-lines"><div class="skeleton skeleton-line w-65"></div><div class="skeleton skeleton-line w-45"></div></div></div>
+                    <div class="chat-item-skeleton"><div class="skeleton skeleton-avatar"></div><div class="skeleton-lines"><div class="skeleton skeleton-line w-50"></div><div class="skeleton skeleton-line w-35"></div></div></div>
+                    <div class="chat-item-skeleton"><div class="skeleton skeleton-avatar"></div><div class="skeleton-lines"><div class="skeleton skeleton-line w-60"></div><div class="skeleton skeleton-line w-40"></div></div></div>
+                </div>
+                <div class="chat-list-empty" id="chat-list-empty" hidden>No conversations yet. Start a new chat above.</div>
+            </div>
+        </aside>
+
+        <main class="chat-main">
+            <div class="chat-empty" id="chat-empty">
+                <div class="chat-empty-card">
+                    <div class="logo-mark">SC</div>
+                    <h2>SecureChat</h2>
+                    <p>Select a conversation on the left, or start a new encrypted chat.</p>
+                </div>
+            </div>
+
+            <div class="chat-container" id="chat-panel" hidden>
+                <div class="chat-header">
+                    <button type="button" class="icon-btn mobile-back" onclick="showSidebarOnly()">←</button>
+                    <div class="peer-avatar" id="peer-avatar">?</div>
+                    <div class="peer-meta">
+                        <div class="peer-name" id="peer-name">Select a chat</div>
+                        <div class="peer-status" id="peer-status">offline</div>
+                    </div>
+                    <div class="header-right">
+                        <span id="status-dot" class="status-dot">Connecting...</span>
+                    </div>
+                </div>
+
+                <div class="key-panel" id="key-panel" hidden>
+                    <div class="key-input-row">
+                        <input type="text" id="recipient-input" placeholder="Recipient username" class="input-field small" hidden>
+                        <button class="btn-primary small" type="button" id="connect-btn" onclick="startKeyExchange()">
+                            Establish encryption
+                        </button>
+                    </div>
+                    <div id="fingerprint-display" class="fingerprint-box" style="display:none"></div>
+                </div>
+
+                <div class="messages-wrap">
+                    <div class="messages-area" id="messages-area">
+                        <div class="system-msg">
+                            Messages are end-to-end encrypted. Server cannot read them.
+                        </div>
+                    </div>
+
+                    <!-- Message history skeleton -->
+                    <div class="messages-skeleton" id="messages-skeleton" hidden>
+                        <div class="msg-skel left"><div class="skeleton skeleton-bubble w-55"></div></div>
+                        <div class="msg-skel right"><div class="skeleton skeleton-bubble w-40"></div></div>
+                        <div class="msg-skel left"><div class="skeleton skeleton-bubble w-65"></div></div>
+                        <div class="msg-skel right"><div class="skeleton skeleton-bubble w-50"></div></div>
+                        <div class="msg-skel left"><div class="skeleton skeleton-bubble w-35"></div></div>
+                        <div class="msg-skel right"><div class="skeleton skeleton-bubble w-60"></div></div>
+                    </div>
+
+                    <!-- Encryption / history loader overlay -->
+                    <div class="chat-panel-loader" id="chat-panel-loader" hidden>
+                        <div class="spinner"></div>
+                        <p id="chat-panel-loader-text">Establishing secure session...</p>
+                    </div>
+                </div>
+
+                <div id="typing-indicator" class="typing-indicator" style="display:none"></div>
+
+                <div class="input-area">
+                    <input type="text" id="message-input"
+                           placeholder="Type a message"
+                           class="input-field" disabled
+                           oninput="notifyTyping()"
+                           onkeypress="if(event.key==='Enter') sendMessage()">
+                    <button class="btn-send" id="send-btn" onclick="sendMessage()" disabled>
+                        Send
+                    </button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Logout confirmation modal -->
+    <div class="modal-overlay" id="logout-modal" hidden>
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="logout-modal-title">
+            <h3 id="logout-modal-title" class="modal-title">Log out?</h3>
+            <p class="modal-text">You’ll need to sign in again (with OTP) to continue chatting.</p>
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary modal-btn" id="logout-cancel-btn" onclick="closeLogoutModal()">Cancel</button>
+                <button type="button" class="btn-danger modal-btn" id="logout-confirm-btn" onclick="confirmLogout()">Log out</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Info / user-not-found modal -->
+    <div class="modal-overlay" id="notice-modal" hidden>
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="notice-modal-title">
+            <h3 id="notice-modal-title" class="modal-title">User not found</h3>
+            <p class="modal-text" id="notice-modal-text">This user is not registered.</p>
+            <div class="modal-actions single">
+                <button type="button" class="btn-primary modal-btn" id="notice-ok-btn" onclick="closeNoticeModal()">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const CURRENT_USER = {{ username|tojson }};
+        const SERVER_URL = {{ server_url|tojson }};
+    </script>
+    <script src="/static/chat.js"></script>
+</body>
+</html>
