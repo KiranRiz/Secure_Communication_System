@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile — SecureChat</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="auth-page profile-page">
+    <div class="auth-shell profile-shell">
+        <div class="auth-container profile-container">
+            <div class="auth-brand">
+                <div class="logo-mark">SC</div>
+                <div>
+                    <div class="logo">Account</div>
+                    <p class="tagline">Profile & security settings</p>
+                </div>
+            </div>
+
+            <!-- Loading skeleton -->
+            <div id="profile-skeleton" class="profile-skeleton">
+                <div class="profile-hero skeleton-hero">
+                    <div class="skeleton skeleton-avatar-lg"></div>
+                    <div class="skeleton-lines" style="flex:1">
+                        <div class="skeleton skeleton-line w-55"></div>
+                        <div class="skeleton skeleton-line w-35"></div>
+                        <div class="skeleton skeleton-line w-70"></div>
+                    </div>
+                </div>
+                <div class="skeleton skeleton-line w-40 sk-title"></div>
+                <div class="skeleton skeleton-field"></div>
+                <div class="skeleton skeleton-field"></div>
+                <div class="skeleton skeleton-field tall"></div>
+                <div class="skeleton skeleton-btn"></div>
+                <div class="skeleton skeleton-line w-40 sk-title"></div>
+                <div class="skeleton skeleton-field"></div>
+                <div class="skeleton skeleton-field"></div>
+                <div class="skeleton skeleton-btn"></div>
+            </div>
+
+            <div id="profile-content" hidden>
+            <div class="profile-hero">
+                <div class="avatar profile-avatar-lg" id="preview-avatar">?</div>
+                <div class="profile-hero-meta">
+                    <div class="profile-hero-name" id="preview-name">{{ username }}</div>
+                    <div class="profile-hero-handle">@{{ username }}</div>
+                    <p class="profile-hero-bio" id="preview-bio">No bio yet</p>
+                </div>
+            </div>
+
+            <section class="profile-section">
+                <h3 class="profile-section-title">Profile</h3>
+
+                <label class="field-label" for="display-name">Display name</label>
+                <input type="text" id="display-name" class="input-field" placeholder="Your name" maxlength="80">
+
+                <label class="field-label" for="bio">Bio</label>
+                <textarea id="bio" class="input-field profile-textarea" placeholder="A short bio" maxlength="280" rows="3"></textarea>
+
+                <label class="field-label" for="avatar-url">Avatar image URL</label>
+                <input type="url" id="avatar-url" class="input-field" placeholder="https://.../photo.jpg">
+                <p class="field-hint">
+                    Use a <strong>direct image link</strong> (ends with .jpg/.png/.webp or from an image CDN).
+                    Page links like pngtree.com won’t work.
+                    Example: <code>https://i.pravatar.cc/150?u={{ username }}</code>
+                </p>
+                <p class="field-hint error-hint" id="avatar-hint" hidden></p>
+
+                <button type="button" class="btn-primary" id="save-profile-btn" onclick="saveProfile()">Save profile</button>
+            </section>
+
+            <section class="profile-section">
+                <h3 class="profile-section-title">Change password</h3>
+                <label class="field-label" for="current-password">Current password</label>
+                <input type="password" id="current-password" class="input-field" autocomplete="current-password">
+                <label class="field-label" for="new-password">New password</label>
+                <input type="password" id="new-password" class="input-field" placeholder="8+ chars, upper, lower, number" autocomplete="new-password">
+                <button type="button" class="btn-primary" id="change-password-btn" onclick="changePassword()">Update password</button>
+            </section>
+
+            <section class="profile-section danger-section">
+                <h3 class="profile-section-title">Danger zone</h3>
+                <p class="panel-subtitle">Deleting your account cannot be undone.</p>
+                <label class="field-label" for="delete-password">Confirm with password</label>
+                <input type="password" id="delete-password" class="input-field" autocomplete="current-password">
+                <button type="button" class="btn-danger" id="delete-account-btn" onclick="openDeleteModal()">Delete account</button>
+            </section>
+            </div>
+
+            <div id="message" class="message" hidden></div>
+
+            <p class="auth-link-row">
+                <a id="back-chat" class="auth-link" href="#">← Back to chat</a>
+            </p>
+        </div>
+    </div>
+
+    <!-- Delete account confirmation modal -->
+    <div class="modal-overlay" id="delete-modal" hidden>
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="delete-modal-title">
+            <h3 id="delete-modal-title" class="modal-title">Delete account?</h3>
+            <p class="modal-text">
+                This permanently deletes your account. You will be signed out and will need to register again to use SecureChat.
+            </p>
+            <div class="modal-actions">
+                <button type="button" class="btn-secondary modal-btn" id="delete-cancel-btn" onclick="closeDeleteModal()">Cancel</button>
+                <button type="button" class="btn-danger modal-btn" id="delete-confirm-btn" onclick="confirmDeleteAccount()">Delete account</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const USERNAME = {{ username|tojson }};
+        document.getElementById('back-chat').href = `/chat?username=${encodeURIComponent(USERNAME)}`;
+
+        let requestInFlight = false;
+
+        function authHeaders() {
+            return {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + (localStorage.getItem('access_token') || '')
+            };
+        }
+
+        function initials(name) {
+            return ((name || USERNAME || '?').trim().slice(0, 2) || '?').toUpperCase();
+        }
+
+        function isLikelyImageUrl(url) {
+            if (!url || typeof url !== 'string') return false;
+            const u = url.trim();
+            if (!/^https?:\/\//i.test(u)) return false;
+            if (/\/(free-png-vectors|search|collection|category)(\/|$)/i.test(u)) return false;
+            return true;
+        }
+
+        function setPreviewAvatar(url, name) {
+            const el = document.getElementById('preview-avatar');
+            el.innerHTML = '';
+            el.classList.remove('has-image');
+            const label = initials(name);
+            const hint = document.getElementById('avatar-hint');
+            el.textContent = label;
+
+            if (!url) {
+                hint.hidden = true;
+                return;
+            }
+            if (!isLikelyImageUrl(url)) {
+                hint.hidden = false;
+                hint.textContent = 'This does not look like a direct image URL. Paste a link to the image file itself.';
+                return;
+            }
+
+            const img = document.createElement('img');
+            img.className = 'avatar-img';
+            img.alt = 'avatar preview';
+            img.decoding = 'async';
+            img.referrerPolicy = 'no-referrer';
+            img.onload = () => {
+                el.classList.add('has-image');
+                el.replaceChildren(img);
+                hint.hidden = true;
+            };
+            img.onerror = () => {
+                el.classList.remove('has-image');
+                el.textContent = label;
+                hint.hidden = false;
+                hint.textContent = 'Image failed to load. Use a direct .jpg/.png/.webp URL (not a webpage).';
+            };
+            img.src = url.trim();
+        }
+
+        function updateLivePreview() {
+            const name = document.getElementById('display-name').value.trim() || USERNAME;
+            const bio = document.getElementById('bio').value.trim();
+            const url = document.getElementById('avatar-url').value.trim();
+            document.getElementById('preview-name').textContent = name;
+            document.getElementById('preview-bio').textContent = bio || 'No bio yet';
+            setPreviewAvatar(url, name);
+        }
+
+        function showMessage(msg, type) {
+            const el = document.getElementById('message');
+            if (!msg) {
+                el.hidden = true;
+                return;
+            }
+            el.hidden = false;
+            el.textContent = msg;
+            el.className = 'message ' + type;
+        }
+
+        function setButtonLoading(btn, loading, text) {
+            if (!btn) return;
+            if (loading) {
+                if (!btn.dataset.originalText) btn.dataset.originalText = btn.textContent;
+                btn.disabled = true;
+                btn.classList.add('is-loading');
+                btn.textContent = text || 'Please wait...';
+            } else {
+                btn.disabled = false;
+                btn.classList.remove('is-loading');
+                if (btn.dataset.originalText) {
+                    btn.textContent = btn.dataset.originalText;
+                    delete btn.dataset.originalText;
+                }
+            }
+        }
+
+        function showProfileSkeleton(show) {
+            const skel = document.getElementById('profile-skeleton');
+            const content = document.getElementById('profile-content');
+            if (skel) skel.hidden = !show;
+            if (content) content.hidden = !!show;
+        }
+
+        async function loadProfile() {
+            if (!localStorage.getItem('access_token')) {
+                window.location.href = '/';
+                return;
+            }
+            showProfileSkeleton(true);
+            try {
+                const res = await fetch('/api/profile', { headers: authHeaders() });
+                const data = await res.json();
+                if (!data.success) {
+                    showMessage(data.message || 'Auth required', 'error');
+                    return;
+                }
+                const p = data.user.profile || {};
+                document.getElementById('display-name').value = p.display_name || '';
+                document.getElementById('bio').value = p.bio || '';
+                document.getElementById('avatar-url').value = p.avatar_url || '';
+                updateLivePreview();
+            } catch (e) {
+                showMessage('Could not load profile', 'error');
+            } finally {
+                showProfileSkeleton(false);
+            }
+        }
+
+        async function saveProfile() {
+            if (requestInFlight) return;
+            const btn = document.getElementById('save-profile-btn');
+            const avatarUrl = document.getElementById('avatar-url').value.trim();
+            if (avatarUrl && !isLikelyImageUrl(avatarUrl)) {
+                showMessage('Avatar must be a direct image URL, not a webpage link.', 'error');
+                return;
+            }
+            requestInFlight = true;
+            setButtonLoading(btn, true, 'Saving...');
+            try {
+                const res = await fetch('/api/profile', {
+                    method: 'PUT',
+                    headers: authHeaders(),
+                    body: JSON.stringify({
+                        display_name: document.getElementById('display-name').value,
+                        bio: document.getElementById('bio').value,
+                        avatar_url: avatarUrl
+                    })
+                });
+                const data = await res.json();
+                showMessage(data.message || 'Saved', data.success ? 'success' : 'error');
+                if (data.success) updateLivePreview();
+            } catch (e) {
+                showMessage('Server not reachable', 'error');
+            } finally {
+                requestInFlight = false;
+                setButtonLoading(btn, false);
+            }
+        }
+
+        async function changePassword() {
+            if (requestInFlight) return;
+            const btn = document.getElementById('change-password-btn');
+            requestInFlight = true;
+            setButtonLoading(btn, true, 'Updating...');
+            try {
+                const res = await fetch('/api/change-password', {
+                    method: 'POST',
+                    headers: authHeaders(),
+                    body: JSON.stringify({
+                        current_password: document.getElementById('current-password').value,
+                        new_password: document.getElementById('new-password').value
+                    })
+                });
+                const data = await res.json();
+                showMessage(data.message || 'Done', data.success ? 'success' : 'error');
+                if (data.success) {
+                    localStorage.removeItem('access_token');
+                    localStorage.removeItem('refresh_token');
+                    localStorage.removeItem('username');
+                    setTimeout(() => window.location.href = '/', 1000);
+                }
+            } catch (e) {
+                showMessage('Server not reachable', 'error');
+            } finally {
+                requestInFlight = false;
+                setButtonLoading(btn, false);
+            }
+        }
+
+        function openDeleteModal() {
+            if (requestInFlight) return;
+            const password = document.getElementById('delete-password').value;
+            if (!password) {
+                showMessage('Enter your password to confirm account deletion.', 'error');
+                document.getElementById('delete-password').focus();
+                return;
+            }
+            const modal = document.getElementById('delete-modal');
+            if (!modal) return;
+            modal.hidden = false;
+            document.getElementById('delete-confirm-btn')?.focus();
+        }
+
+        function closeDeleteModal() {
+            const modal = document.getElementById('delete-modal');
+            if (!modal) return;
+            modal.hidden = true;
+            const btn = document.getElementById('delete-confirm-btn');
+            if (btn) {
+                btn.disabled = false;
+                btn.classList.remove('is-loading');
+                if (btn.dataset.originalText) {
+                    btn.textContent = btn.dataset.originalText;
+                    delete btn.dataset.originalText;
+                } else {
+                    btn.textContent = 'Delete account';
+                }
+            }
+        }
+
+        async function confirmDeleteAccount() {
+            if (requestInFlight) return;
+            const btn = document.getElementById('delete-confirm-btn');
+            const dangerBtn = document.getElementById('delete-account-btn');
+            requestInFlight = true;
+            setButtonLoading(btn, true, 'Deleting...');
+            setButtonLoading(dangerBtn, true, 'Deleting...');
+            try {
+                const res = await fetch('/api/account', {
+                    method: 'DELETE',
+                    headers: authHeaders(),
+                    body: JSON.stringify({
+                        password: document.getElementById('delete-password').value
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    closeDeleteModal();
+                    showMessage(data.message || 'Account deleted', 'success');
+                    localStorage.clear();
+                    setTimeout(() => window.location.href = '/', 1000);
+                } else {
+                    closeDeleteModal();
+                    showMessage(data.message || 'Could not delete account', 'error');
+                }
+            } catch (e) {
+                closeDeleteModal();
+                showMessage('Server not reachable', 'error');
+            } finally {
+                requestInFlight = false;
+                setButtonLoading(btn, false);
+                setButtonLoading(dangerBtn, false);
+            }
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeDeleteModal();
+        });
+
+        document.addEventListener('click', (e) => {
+            const modal = document.getElementById('delete-modal');
+            if (!modal || modal.hidden) return;
+            if (e.target === modal) closeDeleteModal();
+        });
+
+        ['display-name', 'bio', 'avatar-url'].forEach(id => {
+            document.getElementById(id).addEventListener('input', updateLivePreview);
+        });
+
+        loadProfile();
+    </script>
+</body>
+</html>
