@@ -3,102 +3,238 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial
-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Secure Chat — Login</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
 </head>
 
-<body>
-    <div class="auth-container">
+<body class="auth-page">
+    <div class="auth-shell">
+        <div class="auth-container">
+            <div class="auth-brand">
+                <div class="logo-mark" aria-hidden="true">SC</div>
+                <div>
+                    <div class="logo">SecureChat</div>
+                    <p class="tagline">End-to-end encrypted messaging</p>
+                </div>
+            </div>
 
-        <!-- Logo -->
-        <div class="logo">
-            🔐 SecureChat
+            <div class="tabs" id="auth-tabs">
+                <button type="button" class="tab active" data-tab="login" onclick="showAuthView('login')">Login</button>
+                <button type="button" class="tab" data-tab="register" onclick="showAuthView('register')">Register</button>
+            </div>
+
+            <!-- LOGIN -->
+            <div id="login-form" class="auth-panel">
+                <label class="field-label" for="login-username">Username</label>
+                <input type="text" id="login-username" placeholder="Enter username" class="input-field" autocomplete="username">
+
+                <label class="field-label" for="login-password">Password</label>
+                <input type="password" id="login-password" placeholder="Enter password" class="input-field" autocomplete="current-password">
+
+                <button type="button" class="btn-primary" id="login-btn" onclick="handleLogin()">Sign in</button>
+
+                <p class="auth-link-row">
+                    <a href="#" class="auth-link" onclick="showAuthView('forgot'); return false;">Forgot password?</a>
+                </p>
+            </div>
+
+            <!-- REGISTER -->
+            <div id="register-form" class="auth-panel" hidden>
+                <label class="field-label" for="reg-username">Username</label>
+                <input type="text" id="reg-username" placeholder="Choose a username" class="input-field" autocomplete="username">
+
+                <label class="field-label" for="reg-email">Email</label>
+                <input type="email" id="reg-email" placeholder="you@gmail.com" class="input-field" autocomplete="email">
+
+                <label class="field-label" for="reg-password">Password</label>
+                <input type="password" id="reg-password" placeholder="8+ chars, upper, lower, number" class="input-field" autocomplete="new-password">
+
+                <label class="field-label" for="reg-confirm">Confirm password</label>
+                <input type="password" id="reg-confirm" placeholder="Repeat password" class="input-field" autocomplete="new-password">
+
+                <button type="button" class="btn-primary" id="register-btn" onclick="handleRegister()">Create account</button>
+
+                <p class="auth-link-row">
+                    <a href="#" class="auth-link" onclick="showAuthView('forgot'); return false;">Forgot password?</a>
+                </p>
+            </div>
+
+            <!-- OTP (shown as step, not a tab) -->
+            <div id="otp-form" class="auth-panel" hidden>
+                <button type="button" class="back-link" onclick="backFromOtp()">← Back</button>
+                <h2 class="panel-title" id="otp-title">Verify OTP</h2>
+                <p class="panel-subtitle" id="otp-hint">Enter the 6-digit code sent to your email.</p>
+
+                <label class="field-label" for="otp-email">Email</label>
+                <input type="email" id="otp-email" placeholder="Email address" class="input-field" autocomplete="email">
+
+                <label class="field-label" for="otp-code">One-time code</label>
+                <input type="text" id="otp-code" placeholder="6-digit OTP" class="input-field otp-input" maxlength="6" inputmode="numeric" autocomplete="one-time-code">
+
+                <button type="button" class="btn-primary" id="verify-otp-btn" onclick="handleVerifyOtp()">Confirm OTP</button>
+                <button type="button" class="btn-secondary" id="resend-otp-btn" onclick="handleResendOtp()" disabled>
+                    Resend OTP in 60s
+                </button>
+            </div>
+
+            <!-- FORGOT (link opens this panel) -->
+            <div id="forgot-form" class="auth-panel" hidden>
+                <button type="button" class="back-link" onclick="showAuthView('login')">← Back to login</button>
+                <h2 class="panel-title">Reset password</h2>
+                <p class="panel-subtitle">We’ll email you a secure reset link.</p>
+
+                <label class="field-label" for="forgot-email">Account email</label>
+                <input type="email" id="forgot-email" placeholder="you@gmail.com" class="input-field" autocomplete="email">
+
+                <button type="button" class="btn-primary" id="forgot-btn" onclick="handleForgot()">Send reset link</button>
+            </div>
+
+            <div id="message" class="message" hidden></div>
+
+            <div class="security-badge">
+                <span>AES-256-GCM</span>
+                <span class="dot">·</span>
+                <span>ECDH</span>
+                <span class="dot">·</span>
+                <span>JWT + OTP</span>
+            </div>
         </div>
-        <p class="tagline">End-to-End Encrypted Messaging</p>
-
-        <!-- Tabs -->
-        <div class="tabs">
-            <button class="tab active" onclick="showTab('login')">
-                Login
-            </button>
-            <button class="tab" onclick="showTab('register')">
-                Register
-            </button>
-        </div>
-
-        <!-- Login Form -->
-        <div id="login-form">
-            <input type="text" id="login-username" placeholder="Username" class="input-field">
-            <input type="password" id="login-password" placeholder="Password" class="input-field">
-            <button class="btn-primary" onclick="handleLogin()">
-                Login
-            </button>
-        </div>
-
-        <div id="register-form" style="display:none">
-
-            <input type="text" id="reg-username" placeholder="Choose Username" class="input-field">
-
-            <input type="email" id="reg-email" placeholder="Email Address (for identity)" class="input-field">
-
-            <input type="password" id="reg-password" placeholder="Choose Password (min 6 chars)" class="input-field">
-
-            <input type="password" id="reg-confirm" placeholder="Confirm Password" class="input-field">
-
-            <button class="btn-primary" onclick="handleRegister()">
-                Create Account
-            </button>
-
-            <p style="color:#555;font-size:0.8rem;margin-top:12px;">
-                📧 Email is used for identity verification only.
-            </p>
-
-        </div>
-
-        <!-- Message -->
-        <div id="message" class="message"></div>
-
-        <!-- Encryption Info -->
-        <div class="security-badge">
-            🛡️ AES-256-GCM Encrypted &nbsp;|&nbsp;
-            🔑 ECDH Key Exchange &nbsp;|&nbsp;
-            🚫 Zero Knowledge Server
-        </div>
-
     </div>
 
     <script>
-        function showTab(tab) {
-            document.getElementById('login-form').style.display =
-                tab === 'login' ? 'block' : 'none';
-            document.getElementById('register-form').style.display =
-                tab === 'register' ? 'block' : 'none';
-            document.querySelectorAll('.tab').forEach((t, i) => {
-                t.classList.toggle('active',
-                    (tab === 'login' && i === 0) ||
-                    (tab === 'register' && i === 1));
+        let otpPurpose = 'verification';
+        let pendingLoginUsername = '';
+        let lastAuthView = 'login';
+        let resendSecondsLeft = 0;
+        let resendTimer = null;
+        let requestInFlight = false;
+
+        function setButtonLoading(btn, loading, loadingText) {
+            if (!btn) return;
+            if (loading) {
+                if (!btn.dataset.originalText) {
+                    btn.dataset.originalText = btn.textContent;
+                }
+                btn.disabled = true;
+                btn.classList.add('is-loading');
+                btn.textContent = loadingText || 'Please wait...';
+            } else {
+                btn.disabled = false;
+                btn.classList.remove('is-loading');
+                if (btn.dataset.originalText) {
+                    btn.textContent = btn.dataset.originalText;
+                    delete btn.dataset.originalText;
+                }
+            }
+        }
+
+        function showAuthView(view) {
+            const panels = ['login-form', 'register-form', 'otp-form', 'forgot-form'];
+            panels.forEach(id => {
+                document.getElementById(id).hidden = true;
             });
+
+            const tabs = document.getElementById('auth-tabs');
+            const showTabs = (view === 'login' || view === 'register');
+            tabs.hidden = !showTabs;
+
+            if (view === 'login' || view === 'register') {
+                lastAuthView = view;
+                document.getElementById(view + '-form').hidden = false;
+                document.querySelectorAll('.tab').forEach(t => {
+                    t.classList.toggle('active', t.dataset.tab === view);
+                });
+            } else if (view === 'otp') {
+                document.getElementById('otp-form').hidden = false;
+                updateOtpCopy();
+            } else if (view === 'forgot') {
+                document.getElementById('forgot-form').hidden = false;
+            }
+        }
+
+        function updateOtpCopy() {
+            const title = document.getElementById('otp-title');
+            const hint = document.getElementById('otp-hint');
+            if (otpPurpose === 'login') {
+                title.textContent = 'Confirm login';
+                hint.textContent = 'We sent a login code to your email. Enter it to finish signing in.';
+            } else {
+                title.textContent = 'Verify your email';
+                hint.textContent = 'Enter the 6-digit code we sent after registration.';
+            }
+        }
+
+        function backFromOtp() {
+            if (requestInFlight) return;
+            showAuthView(otpPurpose === 'login' ? 'login' : 'register');
         }
 
         function showMessage(msg, type) {
             const el = document.getElementById('message');
+            if (!msg) {
+                el.hidden = true;
+                el.textContent = '';
+                return;
+            }
+            el.hidden = false;
             el.textContent = msg;
             el.className = 'message ' + type;
         }
 
-        async function handleLogin() {
-            const username =
-                document.getElementById('login-username').value.trim();
-            const password =
-                document.getElementById('login-password').value;
+        function saveSession(data) {
+            localStorage.setItem('access_token', data.access_token);
+            localStorage.setItem('refresh_token', data.refresh_token);
+            localStorage.setItem('username', data.username);
+        }
 
+        function startResendCooldown(seconds) {
+            const btn = document.getElementById('resend-otp-btn');
+            clearInterval(resendTimer);
+            resendSecondsLeft = Math.max(1, seconds || 60);
+            btn.disabled = true;
+            btn.classList.remove('is-loading');
+            delete btn.dataset.originalText;
+            btn.textContent = `Resend OTP in ${resendSecondsLeft}s`;
+
+            resendTimer = setInterval(() => {
+                resendSecondsLeft -= 1;
+                if (resendSecondsLeft <= 0) {
+                    clearInterval(resendTimer);
+                    resendTimer = null;
+                    btn.disabled = false;
+                    btn.textContent = 'Resend OTP';
+                    return;
+                }
+                btn.disabled = true;
+                btn.textContent = `Resend OTP in ${resendSecondsLeft}s`;
+            }, 1000);
+        }
+
+        function openOtpStep(purpose, email, message) {
+            otpPurpose = purpose;
+            if (email) document.getElementById('otp-email').value = email;
+            document.getElementById('otp-code').value = '';
+            showAuthView('otp');
+            showMessage(message, 'success');
+            startResendCooldown(60);
+        }
+
+        async function handleLogin() {
+            if (requestInFlight) return;
+            const btn = document.getElementById('login-btn');
+            const username = document.getElementById('login-username').value.trim();
+            const password = document.getElementById('login-password').value;
             if (!username || !password) {
                 showMessage('Please fill all fields', 'error');
                 return;
             }
 
+            requestInFlight = true;
+            setButtonLoading(btn, true, 'Signing in...');
             try {
                 const res = await fetch('/api/login', {
                     method: 'POST',
@@ -107,79 +243,204 @@ scale=1.0">
                 });
                 const data = await res.json();
 
-                if (data.success) {
+                if (data.requires_otp && data.otp_purpose === 'login') {
+                    pendingLoginUsername = data.username || username;
+                    let msg = data.message || 'OTP sent to your email';
+                    if (data.dev_otp) msg += ` (dev OTP: ${data.dev_otp})`;
+                    openOtpStep('login', data.email, msg);
+                    return;
+                }
+
+                if (data.requires_otp) {
+                    openOtpStep(
+                        data.otp_purpose || 'verification',
+                        data.email,
+                        data.message || 'Please verify your email OTP'
+                    );
+                    return;
+                }
+
+                if (data.success && data.access_token) {
+                    saveSession(data);
                     showMessage('Login successful!', 'success');
                     setTimeout(() => {
-                        window.location.href =
-                            `/chat?username=${username}`;
-                    }, 800);
-                } else {
-                    showMessage(data.message, 'error');
+                        window.location.href = `/chat?username=${encodeURIComponent(username)}`;
+                    }, 500);
+                    return;
                 }
+
+                showMessage(data.message || 'Login failed', 'error');
             } catch (e) {
                 showMessage('Server not reachable', 'error');
+            } finally {
+                requestInFlight = false;
+                setButtonLoading(btn, false);
             }
         }
 
         async function handleRegister() {
-
-            const username =
-                document.getElementById('reg-username').value.trim();
-
-            const email =
-                document.getElementById('reg-email').value.trim();
-
-            const password =
-                document.getElementById('reg-password').value;
-
-            const confirm =
-                document.getElementById('reg-confirm').value;
+            if (requestInFlight) return;
+            const btn = document.getElementById('register-btn');
+            const username = document.getElementById('reg-username').value.trim();
+            const email = document.getElementById('reg-email').value.trim();
+            const password = document.getElementById('reg-password').value;
+            const confirm = document.getElementById('reg-confirm').value;
 
             if (!username || !email || !password || !confirm) {
                 showMessage('Please fill all required fields', 'error');
                 return;
             }
-
             if (password !== confirm) {
                 showMessage('Passwords do not match', 'error');
                 return;
             }
 
-            if (password.length < 6) {
-                showMessage('Password must be at least 6 characters', 'error');
-                return;
-            }
-
+            requestInFlight = true;
+            setButtonLoading(btn, true, 'Creating account...');
             try {
-
                 const res = await fetch('/api/register', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        username,
-                        email,
-                        password
-                    })
+                    body: JSON.stringify({ username, email, password })
                 });
-
                 const data = await res.json();
-
                 if (data.success) {
-
-                    showMessage('✅ Registered successfully! Please login.', 'success');
-
-                    setTimeout(() => {
-                        showTab('login');
-                    }, 1200);
-
+                    pendingLoginUsername = '';
+                    let msg = data.message || 'OTP sent';
+                    if (data.dev_otp) msg += ` (dev OTP: ${data.dev_otp})`;
+                    openOtpStep('verification', email, msg);
                 } else {
-                    showMessage(data.message, 'error');
+                    showMessage(data.message || 'Registration failed', 'error');
                 }
-
             } catch (e) {
                 showMessage('Server not reachable', 'error');
+            } finally {
+                requestInFlight = false;
+                setButtonLoading(btn, false);
             }
         }
+
+        async function handleVerifyOtp() {
+            if (requestInFlight) return;
+            const btn = document.getElementById('verify-otp-btn');
+            const email = document.getElementById('otp-email').value.trim();
+            const otp = document.getElementById('otp-code').value.trim();
+            if (!email || !otp) {
+                showMessage('Email and OTP required', 'error');
+                return;
+            }
+
+            requestInFlight = true;
+            setButtonLoading(btn, true, 'Verifying...');
+            try {
+                const res = await fetch('/api/verify-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, otp, purpose: otpPurpose })
+                });
+                const data = await res.json();
+                if (!data.success) {
+                    showMessage(data.message || 'OTP failed', 'error');
+                    return;
+                }
+
+                if (otpPurpose === 'login' && data.access_token) {
+                    saveSession(data);
+                    showMessage('Login successful!', 'success');
+                    const user = data.username || pendingLoginUsername;
+                    setTimeout(() => {
+                        window.location.href = `/chat?username=${encodeURIComponent(user)}`;
+                    }, 500);
+                    return;
+                }
+
+                showMessage('Email verified! Please sign in.', 'success');
+                otpPurpose = 'verification';
+                setTimeout(() => showAuthView('login'), 700);
+            } catch (e) {
+                showMessage('Server not reachable', 'error');
+            } finally {
+                requestInFlight = false;
+                setButtonLoading(btn, false);
+            }
+        }
+
+        async function handleResendOtp() {
+            const btn = document.getElementById('resend-otp-btn');
+            if (requestInFlight || btn.disabled || resendSecondsLeft > 0) return;
+
+            const email = document.getElementById('otp-email').value.trim();
+            if (!email) {
+                showMessage('Enter email first', 'error');
+                return;
+            }
+
+            requestInFlight = true;
+            setButtonLoading(btn, true, 'Sending...');
+            try {
+                const res = await fetch('/api/resend-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, purpose: otpPurpose })
+                });
+                const data = await res.json();
+                let msg = data.message || 'Done';
+                if (data.dev_otp) msg += ` (dev OTP: ${data.dev_otp})`;
+                showMessage(msg, data.success ? 'success' : 'error');
+
+                const wait = data.retry_after || 60;
+                if (data.success || data.retry_after) {
+                    startResendCooldown(wait);
+                } else {
+                    setButtonLoading(btn, false);
+                    btn.textContent = 'Resend OTP';
+                }
+            } catch (e) {
+                showMessage('Server not reachable', 'error');
+                setButtonLoading(btn, false);
+                btn.textContent = 'Resend OTP';
+            } finally {
+                requestInFlight = false;
+            }
+        }
+
+        async function handleForgot() {
+            if (requestInFlight) return;
+            const btn = document.getElementById('forgot-btn');
+            const email = document.getElementById('forgot-email').value.trim();
+            if (!email) {
+                showMessage('Enter your email', 'error');
+                return;
+            }
+
+            requestInFlight = true;
+            setButtonLoading(btn, true, 'Sending...');
+            try {
+                const res = await fetch('/api/forgot-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+                const data = await res.json();
+                let msg = data.message || 'Done';
+                if (data.dev_reset_link) msg += ` Link: ${data.dev_reset_link}`;
+                showMessage(msg, data.success ? 'success' : 'error');
+            } catch (e) {
+                showMessage('Server not reachable', 'error');
+            } finally {
+                requestInFlight = false;
+                setButtonLoading(btn, false);
+            }
+        }
+
+        // Enter key submits current panel (ignored while a request is running)
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Enter' || requestInFlight) return;
+            if (!document.getElementById('login-form').hidden) handleLogin();
+            else if (!document.getElementById('register-form').hidden) handleRegister();
+            else if (!document.getElementById('otp-form').hidden) handleVerifyOtp();
+            else if (!document.getElementById('forgot-form').hidden) handleForgot();
+        });
     </script>
 </body>
 

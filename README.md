@@ -1,132 +1,310 @@
-# Secure_Communication_System
+# Secure Communication System
 
-CA One project for B9IS129 Computer Systems Security (DBS, Semester 2), under Paul Laird. Built by Mubashir, Hamza and Kiran.
+## Course & Assessment Information
 
-## What this project actually does
+| Field | Details |
+|-------|---------|
+| **Module code** | B9IS129 |
+| **Module title** | Computer Systems Security |
+| **Class / CRN** | B9IS129_2526_TMD3 |
+| **Institution** | Dublin Business School (DBS) |
+| **Assessment** | CA_ONE_(100%) |
+| **Assessment weight** | 100% of module |
+| **Lecturer** | Paul Laird |
+| **Semester** | Semester 2, Academic Year 2025/26 |
+| **Project title** | Secure Communication System |
+| **Submission type** | Group project (repository + documentation + demo evidence) |
 
-The brief asks for a communications system where two people can message each other securely **without having met before to exchange keys**. That's the hard requirement - and it's the whole reason this project is built the way it is.
+---
 
-So here's the basic idea: when two users want to chat, their browsers each generate a key pair on the spot (using the Web Crypto API), exchange only the *public* part of that key through our server, and from that they each independently work out the same shared secret. Nobody had to meet up beforehand or share a password over the phone. This is done using ECDH (Elliptic Curve Diffie-Hellman, X25519 curve).
+## Group Members & Roles
 
-Once both sides have that shared secret, every message is encrypted with AES-256-GCM before it ever leaves the browser. The server in the middle only ever sees ciphertext - it relays messages between users but has no
-way of reading them, even if someone broke into the server itself. The assignment calls this a "maliciously curious" server model, and that's exactly the assumption we built around: trust the server to deliver messages, don't trust it with the content.
+| Member | Primary responsibility | Main deliverables |
+|--------|------------------------|-------------------|
+| **Mubashir** | Security & encryption core | `crypto_core/`, threat model, algorithm justification, security docs & tests |
+| **Hamza** | Backend server & deployment | `server/`, MongoDB Atlas, JWT/OTP APIs, Socket.IO relay, replay protection, deployment |
+| **Kiran** | Client & authentication UI | `client/`, browser ECDH/AES (Web Crypto), auth screens, chat UX, user docs |
 
-## Why we picked this approach
+Group meetings were held over Zoom with captions enabled. Recordings, minutes, and AI assistance log links are kept in the shared M365 folder as required by module submission guidelines.
 
-We looked at a few options from the brief (PKI/HTTPS identity, social media identity, email/SMS identity, etc.) and went with what the brief calls "idiosyncratic identity verification" - basically, key fingerprint checking. After the key exchange happens, both users are shown a short fingerprint of the session key. If they want to be sure no one is sitting in the middle of their conversation (a MITM attack), they can read that fingerprint out to each other over a phone call or in person. If the two
-fingerprints match, the connection is genuine. If they don't, someone has tampered with the exchange.
+---
 
-We picked this over something like email-based verification because it doesn't depend on trusting a third party (an email provider, a social media company, etc.) - it only depends on the two people involved actually checking the fingerprint, which fits the brief's requirement that the system shouldn't lean on a trusted third party it can't verify.
+## 1. Abstract
 
-## How the pieces fit together
+This Continuous Assessment (CA_ONE) delivers an end-to-end encrypted messaging system in which two users who have **never previously met to exchange keys** can communicate securely through an untrusted relay server.
+
+Clients perform **ECDH (P-256)** key agreement and **AES-256-GCM** message encryption in the browser via the Web Crypto API. The Flask + Socket.IO server stores public keys, authenticates users, and relays **ciphertext only**. It is designed under a **maliciously curious server** threat model: the server is trusted to deliver messages, but **must not** be able to read message content.
+
+Identity is supported by **email OTP verification** plus **out-of-band key fingerprint checking** (idiosyncratic / TOFU-style MITM detection). Additional hardening includes **bcrypt** password hashing, **JWT** access/refresh sessions, rate limiting, replay protection, ciphertext persistence, and security audit logs.
+
+---
+
+## 2. Assessment Brief Alignment
+
+The CA_ONE brief requires a communications system where parties can message securely **without a prior shared secret**, with a server that **must not be trusted with confidentiality**.
+
+| Brief requirement | How this project meets it |
+|-------------------|---------------------------|
+| Secure messaging without prior key meeting | Browser ECDH key exchange via public-key directory |
+| Untrusted / maliciously curious server | AES-GCM encryption client-side; server sees only ciphertext |
+| Identity approach | Email OTP + human-readable session fingerprint |
+| Replay resistance | Unique `msg_id` + 5-minute ReplayGuard window |
+| Documented, testable design | README, `docs/`, `crypto_core` pytest suite |
+| Team ownership split | Crypto / server / client owned by named members |
+| No security through obscurity | Standard algorithms (ECDH, AES-GCM, bcrypt, JWT) |
+
+---
+
+## 3. Project Objectives
+
+1. Enable real-time encrypted chat between two registered users.
+2. Establish a shared session key without pre-shared passwords between peers.
+3. Ensure the relay server cannot decrypt message payloads.
+4. Authenticate users and protect accounts (hashing, OTP, JWT, rate limits).
+5. Detect or discourage MITM during first key exchange via fingerprint comparison.
+6. Block simple replay of captured ciphertext messages at the relay.
+7. Provide clear architecture, security, and setup documentation for markers and peers.
+
+---
+
+## 4. System Overview
 
 ```
-crypto_core/   - the actual cryptography: ECDH key exchange,
-                 AES-256-GCM encrypt/decrypt, fingerprint generation
-                 (Mubashir)
-
-server/        - Flask + Socket.IO relay server. Handles login/register,
-                 stores public keys so users can look each other up,
-                 forwards encrypted messages, and blocks replay attacks
-                 (Hamza)
-
-client/        - the web app itself: login page, chat page, and the
-                 JavaScript that does the actual key exchange and
-                 encryption inside the browser
-                 (Kiran)
-
-tests/         - pytest tests for the crypto_core module, to check
-                 encryption/decryption actually round-trips correctly
+[ Alice Browser ]                          [ Bob Browser ]
+  ECDH P-256 key pair                        ECDH P-256 key pair
+  AES-256-GCM encrypt/decrypt                AES-256-GCM encrypt/decrypt
+  Fingerprint display                        Fingerprint display
+        |                                           |
+        |  JWT + public keys + ciphertext only      |
+        +------------> [ Flask Server :5000 ] <-----+
+                         MongoDB Atlas
+                         Auth / OTP / Sessions
+                         Public key directory
+                         Ciphertext relay + history
+                         ReplayGuard
+                         Security logs
+        |
+[ Client UI :3000 ]  — login, OTP, chat sidebar, profile
 ```
 
-A simplified flow for one message:
+**Runtime split**
 
-1. Alice and Bob both register on the server with a username/password
-   (passwords are salted and hashed with SHA-256 - never stored in
-   plain text).
-2. When Alice opens a chat with Bob, her browser generates an ECDH key
-   pair and uploads only the public key to the server.
-3. Her browser fetches Bob's public key from the server the same way.
-4. Both browsers now derive the same AES-256 key locally - this key
-   never touches the server.
-5. Alice types a message → encrypted in her browser → sent to the
-   server as ciphertext → server relays it to Bob → Bob's browser
-   decrypts it locally.
-6. If someone replays an old captured message back at the server, the
-   server checks the message's unique ID against ones it's already
-   seen in the last 5 minutes and drops the duplicate.
+| Layer | Technology | Role |
+|-------|------------|------|
+| Client UI | Flask templates + JS/CSS (`client/`) | Auth UX, chat UI, Web Crypto |
+| Relay API | Flask + Flask-SocketIO (`server/`) | REST + real-time events |
+| Database | MongoDB Atlas (`Secure_Communication`) | Users, OTP, sessions, ciphertext, logs |
+| Crypto reference | Python `crypto_core/` | Algorithm reference + automated tests |
 
-## Threat model / assumptions
+---
 
-This is straight from how we interpreted the assignment brief:
+## 5. Security Design
 
-- The server is assumed to behave correctly (it won't deliberately
-  corrupt the protocol) but **is not trusted with confidentiality** -
-  it could be logging everything, and our design has to be safe even
-  then.
-- We are not protecting against an attacker who has already compromised
-  one of the two end devices (that's outside what end-to-end encryption
-  can ever promise).
-- We are relying on users actually checking the fingerprint if they want
-  protection against an active MITM during the *first* key exchange. If
-  they skip that step, an attacker controlling the network at that exact
-  moment could theoretically insert themselves - this is a known
-  trade-off of trust-on-first-use type systems generally and we've noted
-  it as a limitation rather than pretending it doesn't exist.
+### 5.1 Threat model
 
-## Running it locally
+| Assumption | Implication |
+|------------|-------------|
+| Server is honest in protocol execution but curious | May log all traffic; design must keep plaintext off-server |
+| Network may be observed or actively attacked | Need authenticated encryption + MITM detection option |
+| End devices are not fully compromised | E2E encryption cannot protect a compromised browser |
+| Users may skip fingerprint check | TOFU risk acknowledged as a documented limitation |
+
+### 5.2 Cryptographic controls
+
+| Control | Algorithm / mechanism | Where |
+|---------|----------------------|-------|
+| Peer key agreement | ECDH **P-256** (Web Crypto) | Browser (`client/static/chat.js`) |
+| Message confidentiality + integrity | **AES-256-GCM** (fresh nonce per message) | Browser |
+| Password storage | **bcrypt** | Server (`server/auth.py`) |
+| Session auth | **JWT** access + hashed refresh rotation | Server |
+| Email verification / login step-up | **6-digit OTP** (hashed, TTL, attempt limits) | Server + email |
+| Replay protection | UUID `msg_id` + 5-minute seen set | `server/replay_guard.py` |
+| MITM awareness | Session key fingerprint shown in UI | Client |
+| Auth abuse resistance | Rate limit (~5/min on auth) | flask-limiter |
+| Transport hardening (app layer) | CORS lockdown, security headers (Talisman) | Server |
+
+### 5.3 What the server can and cannot see
+
+**Can see:** usernames, emails (account data), public ECDH keys, metadata (who messaged whom, approximate size/time), ciphertext blobs.
+
+**Cannot see:** private keys, shared ECDH secrets, plaintext message content.
+
+---
+
+## 6. Functional Features
+
+### 6.1 Core CA_ONE features
+
+- User registration and login
+- Public key store/fetch (`/store_key`, `/get_key`)
+- ECDH session establishment without prior meeting
+- Real-time encrypted messaging over Socket.IO
+- Key fingerprint display for out-of-band verification
+- Replay attack rejection on duplicate message IDs
+
+### 6.2 Security & account enhancements
+
+- MongoDB Atlas persistence (users, OTPs, sessions, messages, security logs)
+- Email OTP for registration verification
+- Login OTP step (password then email code)
+- Password reset via emailed one-time token
+- JWT-protected REST and Socket.IO identity
+- Rate limiting and security audit logging
+- Profile update, change password, soft-delete account
+
+### 6.3 Client / UX features
+
+- Modern Login / Register / OTP / Forgot-password flows
+- WhatsApp-style sidebar (conversations, search, new chat)
+- Typing indicators, presence, delivery/read status
+- Ciphertext message history load (decryptable when keys persist)
+- Profile page with avatar URL support
+- Loaders/skeletons and logout confirmation
+
+---
+
+## 7. Repository Structure
+
+```
+Secure_Communication_System/
+├── crypto_core/          # Mubashir — ECDH / AES-GCM / fingerprint (Python)
+├── server/               # Hamza — Flask API, Socket.IO, auth, MongoDB
+├── client/               # Kiran — UI templates, static JS/CSS, client app
+├── tests/                # pytest for crypto_core
+├── docs/                 # Architecture, security, setup/API, feature PDF
+├── .env.example          # Required environment variables (no secrets)
+├── requirements.txt
+└── README.md             # This CA_ONE report overview
+```
+
+Supporting docs:
+
+| Document | Purpose |
+|----------|---------|
+| `docs/security_requirements.md` | Security rationale (Mubashir) |
+| `docs/system_architecture.md` | Architecture narrative |
+| `docs/design_specification.md` | FR / NFR / SR tables |
+| `docs/SETUP_AND_API.md` | Env, schema, API & Socket.IO reference |
+| `docs/CA_ONE_Feature_Breakdown_Group.pdf` | Feature ownership PDF for the group |
+
+---
+
+## 8. How to Run (Local)
+
+### Prerequisites
+
+- Python 3.10+ recommended
+- MongoDB Atlas connection string
+- (Optional) Gmail App Password for real OTP email
+
+### Setup
+
+1. Copy `.env.example` to `.env` and set at least:
+   - `MONGODB_URI`
+   - `SECRET_KEY`
+   - `JWT_SECRET`
+2. Install dependencies:
 
 ```bash
 python -m venv venv
-venv\Scripts\activate          # (Windows) or source venv/bin/activate on Mac/Linux
+# Windows:
+venv\Scripts\activate
+# macOS/Linux:
+# source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Start the relay server:
+3. Start the relay server (port **5000**):
+
 ```bash
 python -m server.server
 ```
 
-In a second terminal, start the client web app:
+4. In a second terminal, start the client UI (port **3000**):
+
 ```bash
 python client/app.py
 ```
 
-Then open `http://localhost:3000` in a browser, register two test users,
-log in as each one (e.g. two different browser tabs), and start a chat.
+5. Open `http://localhost:3000`
 
-## Testing
+### Demo flow (recommended for marking)
 
-Encryption module has pytest coverage:
+1. Register User A → complete email OTP  
+2. Register User B → complete email OTP  
+3. Log in each user (password + login OTP) in separate browsers/profiles  
+4. Start chat from sidebar → establish encryption  
+5. Compare fingerprints out-of-band  
+6. Exchange messages; confirm ciphertext-only on server/DB  
+7. Optionally resend a captured `msg_id` to show replay rejection  
+
+**Email OTP:** with `EMAIL_DEV_MODE=true`, OTP is printed in the server console (and may appear in API for local testing). For real email, configure SMTP and set `EMAIL_DEV_MODE=false`.
+
+Full API tables: `docs/SETUP_AND_API.md`.
+
+---
+
+## 9. Testing
+
 ```bash
 python -m pytest tests/
 ```
 
-## Who did what
+`crypto_core` tests verify encryption/decryption round-trips and related helpers. Auth and chat flows are demonstrated manually via the two-browser demo above.
 
-- **Mubashir** - security/cryptography layer: ECDH key exchange, AES-256-GCM
-  encryption, key fingerprinting, vulnerability analysis of the two
-  assigned peer systems.
-- **Hamza** - server: Flask-SocketIO relay, authentication, replay attack
-  protection, cloud deployment.
-- **Kiran** - client: web interface, browser-side encryption logic,
-  documentation.
+---
 
-Group meetings were held over Zoom with captions enabled; recordings and
-minutes are kept in our shared M365 folder along with links to AI
-assistance logs, as required by the module submission guidelines.
+## 10. Contribution Summary (for CA_ONE marking)
 
-## AI assistance
+### Mubashir — Security & encryption core
 
-Parts of this project were built with help from Claude (Anthropic) and ChatGPT, mainly for explaining concepts (ECDH, AES-GCM modes, replay attack handling) and getting a first draft of some boilerplate code, which was then reviewed, tested, and in places rewritten by us. Full conversation links are included in the AI assistance log submitted alongside this repository, as required by the assignment guidelines.
+- Cryptographic design and threat model documentation  
+- `crypto_core` Python implementation and pytest coverage  
+- Algorithm selection rationale (ECDH, AES-GCM, fingerprint)  
+- Peer-system / vulnerability analysis contribution for the write-up  
 
-## Known limitations / what we'd improve with more time
+### Hamza — Backend server & deployment
 
-- Fingerprint verification is currently manual - relies on the user
-  remembering to check it rather than the app enforcing it.
-- User/key storage is a simple JSON file rather than a proper database;
-  fine for a project of this scope but wouldn't scale.
-- No forward secrecy beyond a single session - if a session key were
-  ever compromised, only that session's messages would be exposed
-  (past and future sessions use fresh keys), but we haven't implemented
-  key ratcheting like Signal does.
+- Flask-SocketIO relay and public-key directory  
+- MongoDB Atlas schema, indexes, ciphertext persistence  
+- bcrypt + JWT + OTP services, password reset, rate limiting  
+- ReplayGuard, security logging, CORS/headers, health endpoint  
+- Environment/config documentation and deployment ownership  
+
+### Kiran — Client & authentication
+
+- Auth UI (register, login, OTP, forgot/reset password)  
+- Browser Web Crypto ECDH/AES wiring and fingerprint UI  
+- Chat UX (sidebar, presence, typing, receipts, history)  
+- Profile page and client-facing usability polish  
+
+---
+
+## 11. Known Limitations
+
+- Fingerprint verification is **manual**; the app does not force users to confirm before chatting.  
+- Browser runtime uses **P-256** Web Crypto; the Python `crypto_core` reference may use related curves for testing — docs should be read with that distinction in mind.  
+- No Signal-style double ratchet / full forward-secrecy protocol beyond per-session keys.  
+- Compromised client devices are out of scope for E2E guarantees.  
+- Cloud deployment may be demonstrated separately from local run instructions.  
+
+---
+
+## 12. AI Assistance Statement
+
+Parts of this project were developed with assistance from AI tools (including Cursor / Claude and ChatGPT), primarily for explaining cryptographic concepts, drafting boilerplate, and iterating UI/API structure. All AI-assisted work was reviewed, tested, and adapted by the group. Conversation links and logs are included in the AI assistance evidence submitted with this CA, as required by module guidelines.
+
+---
+
+## 13. Declaration
+
+This submission is the work of the named group members for **B9IS129 Computer Systems Security (B9IS129_2526_TMD3), CA_ONE_(100%)**. Sources, libraries, and AI assistance are acknowledged. Secrets (MongoDB credentials, JWT secrets, SMTP App Passwords) are kept in `.env` and are **not** committed to the repository.
+
+---
+
+**Module:** B9IS129 — Computer Systems Security  
+**Assessment:** CA_ONE_(100%)  
+**Class:** B9IS129_2526_TMD3  
+**Project:** Secure Communication System  
+**Team:** Mubashir · Hamza · Kiran  
+**)
