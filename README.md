@@ -230,13 +230,13 @@ python client/app.py
 
 ### Demo flow (recommended for marking)
 
-1. Register User A → complete email OTP  
-2. Register User B → complete email OTP  
-3. Log in each user (password + login OTP) in separate browsers/profiles  
-4. Start chat from sidebar → establish encryption  
-5. Compare fingerprints out-of-band  
-6. Exchange messages; confirm ciphertext-only on server/DB  
-7. Optionally resend a captured `msg_id` to show replay rejection  
+1. Register User A → complete email OTP
+2. Register User B → complete email OTP
+3. Log in each user (password + login OTP) in separate browsers/profiles
+4. Start chat from sidebar → establish encryption
+5. Compare fingerprints out-of-band
+6. Exchange messages; confirm ciphertext-only on server/DB
+7. Optionally resend a captured `msg_id` to show replay rejection
 
 **Email OTP:** with `EMAIL_DEV_MODE=true`, OTP is printed in the server console (and may appear in API for local testing). For real email, configure SMTP and set `EMAIL_DEV_MODE=false`.
 
@@ -258,35 +258,35 @@ python -m pytest tests/
 
 ### Mubashir — Security & encryption core
 
-- Cryptographic design and threat model documentation  
-- `crypto_core` Python implementation and pytest coverage  
-- Algorithm selection rationale (ECDH, AES-GCM, fingerprint)  
-- Peer-system / vulnerability analysis contribution for the write-up  
+- Cryptographic design and threat model documentation
+- `crypto_core` Python implementation and pytest coverage
+- Algorithm selection rationale (ECDH, AES-GCM, fingerprint)
+- Peer-system / vulnerability analysis contribution for the write-up
 
 ### Hamza — Backend server & deployment
 
-- Flask-SocketIO relay and public-key directory  
-- MongoDB Atlas schema, indexes, ciphertext persistence  
-- bcrypt + JWT + OTP services, password reset, rate limiting  
-- ReplayGuard, security logging, CORS/headers, health endpoint  
-- Environment/config documentation and deployment ownership  
+- Flask-SocketIO relay and public-key directory
+- MongoDB Atlas schema, indexes, ciphertext persistence
+- bcrypt + JWT + OTP services, password reset, rate limiting
+- ReplayGuard, security logging, CORS/headers, health endpoint
+- Environment/config documentation and deployment ownership
 
 ### Kiran — Client & authentication
 
-- Auth UI (register, login, OTP, forgot/reset password)  
-- Browser Web Crypto ECDH/AES wiring and fingerprint UI  
-- Chat UX (sidebar, presence, typing, receipts, history)  
-- Profile page and client-facing usability polish  
+- Auth UI (register, login, OTP, forgot/reset password)
+- Browser Web Crypto ECDH/AES wiring and fingerprint UI
+- Chat UX (sidebar, presence, typing, receipts, history)
+- Profile page and client-facing usability polish
 
 ---
 
 ## 11. Known Limitations
 
-- Fingerprint verification is **manual**; the app does not force users to confirm before chatting.  
-- Browser runtime uses **P-256** Web Crypto; the Python `crypto_core` reference may use related curves for testing — docs should be read with that distinction in mind.  
-- No Signal-style double ratchet / full forward-secrecy protocol beyond per-session keys.  
-- Compromised client devices are out of scope for E2E guarantees.  
-- Cloud deployment may be demonstrated separately from local run instructions.  
+- Fingerprint verification is **manual**; the app does not force users to confirm before chatting.
+- Browser runtime uses **P-256** Web Crypto; the Python `crypto_core` reference may use related curves for testing — docs should be read with that distinction in mind.
+- No Signal-style double ratchet / full forward-secrecy protocol beyond per-session keys.
+- Compromised client devices are out of scope for E2E guarantees.
+- Cloud deployment may be demonstrated separately from local run instructions.
 
 ---
 
@@ -302,9 +302,38 @@ This submission is the work of the named group members for **B9IS129 Computer Sy
 
 ---
 
-**Module:** B9IS129 — Computer Systems Security  
-**Assessment:** CA_ONE_(100%)  
-**Class:** B9IS129_2526_TMD3  
-**Project:** Secure Communication System  
-**Team:** Mubashir · Hamza · Kiran  
-**)
+**Module:** B9IS129 — Computer Systems Security
+**Assessment:** CA_ONE_(100%)
+**Class:** B9IS129_2526_TMD3
+**Project:** Secure Communication System
+**Team:** Mubashir · Hamza · Kiran
+
+
+### 14.1 Live demo links (if deployed)
+
+- Frontend deployment URL
+- Backend/API deployment URL
+- Short note on expected startup latency (if free-tier hosting sleeps)
+
+### 14.2 Deployment configuration summary
+
+- Hosting platforms used (for example Render/Railway/Azure)
+- Required environment variables per service
+- Build/start commands used in production
+
+### 14.3 Security verification evidence
+
+- Short replay-attack test evidence (input, expected output)
+- OTP/rate-limit behaviour evidence (`429` after threshold)
+- Screenshot or note proving ciphertext-only storage in DB
+
+### 14.4 Demo video and evidence links
+
+- Viva/demo recording link
+- Shared folder path for meeting minutes
+- AI assistance log link
+
+### 14.5 Future work roadmap
+
+- Prioritised improvements (for example enforced fingerprint verification, key ratcheting, stronger session trust)
+- Clear distinction between "nice-to-have" and "security-critical next steps"
