@@ -9,22 +9,6 @@
 | Hamza | Backend server — server/, MongoDB Atlas, JWT/OTP APIs, Socket.IO relay, replay protection |
 | Kiran | Client, authentication UI & cloud deployment — client/, browser ECDH/AES (Web Crypto), auth screens, chat UX, AWS deployment, Dockerization, HTTPS setup, user docs |
 
-## Course & Assessment Information
-| Field | Details |
-|---|---|
-| Module code | B9IS129 |
-| Module title | Computer Systems Security |
-| Class / CRN | B9IS129_2526_TMD3 |
-| Institution | Dublin Business School (DBS) |
-| Assessment | CA_ONE (100%) |
-| Assessment weight | 100% of module |
-| Lecturer | Paul Laird |
-| Semester | Semester 2, Academic Year 2025/26 |
-| Project title | Secure Communication System |
-| Submission type | Group project (repository + documentation + demo evidence) |
-
-Group meetings were held over Zoom with captions enabled. Recordings, minutes, and AI assistance log links are kept in the shared M365 folder as required by module submission guidelines.
-
 ---
 
 ## 1. Project Overview
@@ -236,7 +220,6 @@ The application is deployed to a live, publicly reachable environment on AWS, co
 | 5 | WebSocket handshake returned HTTP 400 (even over HTTPS) | Reordered client transports to `["polling", "websocket"]` (was skipping the required polling handshake) |
 | 6 | `/store_key` and `/get_key` failed with invalid JSON (HTML 404) | Added dedicated Nginx `location` blocks for both endpoints (Nginx wasn't routing them to the backend) |
 | 7 | Same user on two browsers caused "Decryption failed" errors | Added single-device session enforcement — new login force-disconnects any existing session |
-| 8 | Offline-sent messages sometimes failed to decrypt once recipient came online | Documented as a known limitation (Section 13) — no key-history support in current crypto_core design |
 
 ## 12. Contribution Summary (for CA_ONE marking)
 
@@ -270,7 +253,6 @@ The application is deployed to a live, publicly reachable environment on AWS, co
 - Browser runtime uses P-256 Web Crypto; the Python crypto_core reference may use related curves for testing — docs should be read with that distinction in mind
 - No Signal-style double ratchet / full forward-secrecy protocol beyond per-session keys — messages sent while a peer is offline can fail to decrypt if the session key is re-established before that peer reads them
 - Compromised client devices are out of scope for E2E guarantees
-- Deployment uses a free sslip.io hostname rather than a purchased domain, since the project scope did not require one
 
 ---
 
