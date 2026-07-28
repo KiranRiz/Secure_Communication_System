@@ -64,6 +64,7 @@ socketio = SocketIO(
     cors_allowed_origins=Config.CORS_ORIGINS,
     logger=False,
     engineio_logger=False,
+    async_mode="eventlet",
 )
 
 auth = AuthManager()
@@ -410,6 +411,11 @@ def on_connect(auth_payload=None):
     if not username:
         print(f"Rejected unauthenticated socket: {request.sid}")
         return False
+    old_sid = connected_users.get(username)
+    if old_sid and old_sid != request.sid:
+        emit("force_logout", {"reason": "Logged in from another device"}, room=old_sid)
+        disconnect(old_sid)
+        sid_users.pop(old_sid, None)
     connected_users[username] = request.sid
     sid_users[request.sid] = username
     join_room(username)
