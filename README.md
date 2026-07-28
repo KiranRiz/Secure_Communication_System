@@ -209,7 +209,7 @@ The application is deployed to a live, publicly reachable environment on AWS, co
 - **Process management:** Containers run in detached mode (`docker compose up -d`) so the application stays up independently of any active SSH session
 
 
-### 10.3 Deployment Challenges & Fixes
+### 10.2 Deployment Challenges & Fixes
 
 | # | Challenge | Fix |
 |---|---|---|
@@ -221,7 +221,7 @@ The application is deployed to a live, publicly reachable environment on AWS, co
 | 6 | `/store_key` and `/get_key` failed with invalid JSON (HTML 404) | Added dedicated Nginx `location` blocks for both endpoints (Nginx wasn't routing them to the backend) |
 | 7 | Same user on two browsers caused "Decryption failed" errors | Added single-device session enforcement — new login force-disconnects any existing session |
 
-## 12. Contribution Summary (for CA_ONE marking)
+## 11. Contribution Summary
 
 **Mubashir — Security & encryption core**
 - Cryptographic design and threat model documentation
@@ -247,7 +247,7 @@ The application is deployed to a live, publicly reachable environment on AWS, co
 
 ---
 
-## 13. Known Limitations
+## 12. Known Limitations
 
 - Fingerprint verification is manual; the app does not force users to confirm before chatting
 - Browser runtime uses P-256 Web Crypto; the Python crypto_core reference may use related curves for testing — docs should be read with that distinction in mind
@@ -256,7 +256,7 @@ The application is deployed to a live, publicly reachable environment on AWS, co
 
 ---
 
-## 14. Learning Resources
+## 13. Learning Resources
 
 - [MDN Web Docs — Web Crypto API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Crypto_API)
 - [Flask-SocketIO documentation](https://flask-socketio.readthedocs.io/)
@@ -267,6 +267,6 @@ The application is deployed to a live, publicly reachable environment on AWS, co
 
 ---
 
-## 15. AI Assistance Statement
+## 14. AI Assistance Statement
 
 Parts of this project were developed with assistance from AI tools (including Cursor / Claude and ChatGPT), primarily for explaining cryptographic concepts, drafting boilerplate, iterating UI/API structure, and troubleshooting the AWS/Docker/Nginx deployment pipeline. All AI-assisted work was reviewed, tested, and adapted by the group. Conversation links and logs are included in the AI assistance evidence submitted with this CA, as required by module guidelines.
