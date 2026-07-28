@@ -113,7 +113,7 @@
     </div>
 
     <script>
-        const USERNAME = {{ username|tojson }};
+        const USERNAME = {{ username |tojson }};
         document.getElementById('back-chat').href = `/chat?username=${encodeURIComponent(USERNAME)}`;
 
         let requestInFlight = false;
@@ -174,7 +174,7 @@
             img.src = url.trim();
         }
 
-        function updateLivePreview() {
+        function renderProfilePreview() {
             const name = document.getElementById('display-name').value.trim() || USERNAME;
             const bio = document.getElementById('bio').value.trim();
             const url = document.getElementById('avatar-url').value.trim();
@@ -235,7 +235,7 @@
                 document.getElementById('display-name').value = p.display_name || '';
                 document.getElementById('bio').value = p.bio || '';
                 document.getElementById('avatar-url').value = p.avatar_url || '';
-                updateLivePreview();
+                renderProfilePreview();
             } catch (e) {
                 showMessage('Could not load profile', 'error');
             } finally {
@@ -265,7 +265,7 @@
                 });
                 const data = await res.json();
                 showMessage(data.message || 'Saved', data.success ? 'success' : 'error');
-                if (data.success) updateLivePreview();
+                if (data.success) renderProfilePreview();
             } catch (e) {
                 showMessage('Server not reachable', 'error');
             } finally {
@@ -378,10 +378,6 @@
             const modal = document.getElementById('delete-modal');
             if (!modal || modal.hidden) return;
             if (e.target === modal) closeDeleteModal();
-        });
-
-        ['display-name', 'bio', 'avatar-url'].forEach(id => {
-            document.getElementById(id).addEventListener('input', updateLivePreview);
         });
 
         loadProfile();
