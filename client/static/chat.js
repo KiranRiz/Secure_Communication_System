@@ -580,7 +580,7 @@ async function openConversation(peer, displayName, avatarUrl) {
 
 function initSocket() {
   socket = io(SERVER_URL, {
-    transports: ["websocket", "polling"],
+    transports: ["polling", "websocket"],
     reconnection: true,
     reconnectionAttempts: 5,
     reconnectionDelay: 1000,
@@ -628,6 +628,11 @@ function initSocket() {
     if (currentRecipient) addSystemMessage(data.message);
   });
 
+  socket.on("force_logout", (data) => {
+  alert(data.reason || "Logged in from another device");
+  logout();
+  });
+
   socket.on("presence", (data) => {
     if (data.status === "online") onlineUsers.add(data.username);
     else onlineUsers.delete(data.username);
@@ -670,6 +675,7 @@ function initSocket() {
         loadSidebar();
       }
     } catch (e) {
+      console.error("Decryption error:", e);
       upsertConversationLocal(fromPeer, "Encrypted message 🔒");
       if (currentRecipient === fromPeer) {
         addSystemMessage("Decryption failed — click Establish encryption");
