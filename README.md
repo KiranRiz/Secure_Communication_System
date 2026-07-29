@@ -2,6 +2,9 @@
 
 **Live application:** https://100.60.238.30.sslip.io
 
+## Meeting folders have been uploaded to SharePoint. Please use the link below to access them.
+https://onedrive.live.com/?redeem=aHR0cHM6Ly8xZHJ2Lm1zL2YvYy85OTMxZTFhYzM1M2I5NzNjL0lnREs0Q1p0QjJWSVJZWXg0WEJkc3o1SEFibm9KVFdrTFlTYmV1TnhXUm03ZGZzP2U9aUdrOURE&id=9931E1AC353B973C%21s6d26e0ca650745488631e1705db33e47&cid=9931E1AC353B973C
+
 ## Group Members
 | Name | Role & Responsibilities |
 |---|---|
