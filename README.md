@@ -267,6 +267,26 @@ The application is deployed to a live, publicly reachable environment on AWS, co
 
 ---
 
+
+
 ## 14. AI Assistance Statement
 
 Parts of this project were developed with assistance from AI tools (including Cursor / Claude and ChatGPT), primarily for explaining cryptographic concepts, drafting boilerplate, iterating UI/API structure, and troubleshooting the AWS/Docker/Nginx deployment pipeline. All AI-assisted work was reviewed, tested, and adapted by the group. Conversation links and logs are included in the AI assistance evidence submitted with this CA, as required by module guidelines.
+
+
+
+
+
+
+
+
+
+###Folder
+
+https://mydbs-my.sharepoint.com/:f:/g/personal/20094573_mydbs_ie/IgA9p6hoBc0AQLvWMquYwJ-yAdDmp7Z60SUQdPperpjIPW8?e=FZQdop
+
+
+
+
+
+
