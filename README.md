@@ -9,8 +9,8 @@ https://onedrive.live.com/?redeem=aHR0cHM6Ly8xZHJ2Lm1zL2YvYy85OTMxZTFhYzM1M2I5Nz
 | Name | Role & Responsibilities |
 |---|---|
 | Mubashir | Security & encryption core — crypto_core/, threat model, algorithm justification, security docs & tests |
-| Hamza | Backend server — server/, MongoDB Atlas, JWT/OTP APIs, Socket.IO relay, replay protection |
-| Kiran | Client, authentication UI & cloud deployment — client/, browser ECDH/AES (Web Crypto), auth screens, chat UX, AWS deployment, Dockerization, HTTPS setup, user docs |
+| Hamza | Backend server — server/, MongoDB Atlas, JWT/OTP APIs, Socket.IO relay, replay protection, AWS deployment, Dockerization, HTTPS setup, user docs |
+| Kiran | Client, authentication UI & cloud deployment — client/, browser ECDH/AES (Web Crypto), auth screens, chat UX |
 
 ---
 
