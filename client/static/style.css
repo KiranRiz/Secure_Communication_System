@@ -707,6 +707,22 @@ body.chat-page {
     word-break: break-all;
 }
 
+.fingerprint-box .fp-warn {
+    display: inline-block;
+    margin-top: 6px;
+    color: #fbbf24;
+}
+
+.fingerprint-box .fp-verified {
+    display: inline-block;
+    margin-top: 6px;
+    color: #34d399;
+}
+
+.fingerprint-box #verify-fp-btn {
+    margin-top: 8px;
+}
+
 .messages-area {
     flex: 1;
     overflow-y: auto;

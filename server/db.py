@@ -50,6 +50,10 @@ def ensure_indexes(db):
     db.messages.create_index("msg_id", unique=True)
     db.messages.create_index([("sender", ASCENDING), ("recipient", ASCENDING)])
 
+    # ReplayGuard: unique msg_id + TTL so entries expire after the window
+    db.replay_ids.create_index("msg_id", unique=True)
+    db.replay_ids.create_index("expires_at", expireAfterSeconds=0)
+
     db.security_logs.create_index([("created_at", DESCENDING)])
     db.security_logs.create_index("event_type")
     db.security_logs.create_index("username")

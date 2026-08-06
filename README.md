@@ -2,12 +2,15 @@
 
 **Live application:** https://100.60.238.30.sslip.io
 
+## Meeting folders have been uploaded to SharePoint. Please use the link below to access them.
+https://onedrive.live.com/?redeem=aHR0cHM6Ly8xZHJ2Lm1zL2YvYy85OTMxZTFhYzM1M2I5NzNjL0lnREs0Q1p0QjJWSVJZWXg0WEJkc3o1SEFibm9KVFdrTFlTYmV1TnhXUm03ZGZzP2U9aUdrOURE&id=9931E1AC353B973C%21s6d26e0ca650745488631e1705db33e47&cid=9931E1AC353B973C
+
 ## Group Members
 | Name | Role & Responsibilities |
 |---|---|
 | Mubashir | Security & encryption core — crypto_core/, threat model, algorithm justification, security docs & tests |
-| Hamza | Backend server — server/, MongoDB Atlas, JWT/OTP APIs, Socket.IO relay, replay protection |
-| Kiran | Client, authentication UI & cloud deployment — client/, browser ECDH/AES (Web Crypto), auth screens, chat UX, AWS deployment, Dockerization, HTTPS setup, user docs |
+| Hamza | Backend server — server/, MongoDB Atlas, JWT/OTP APIs, Socket.IO relay, replay protection, AWS deployment, Dockerization, HTTPS setup, user docs |
+| Kiran | Client, authentication UI & cloud deployment — client/, browser ECDH/AES (Web Crypto), auth screens, chat UX |
 
 ---
 
@@ -249,7 +252,7 @@ The application is deployed to a live, publicly reachable environment on AWS, co
 
 ## 12. Known Limitations
 
-- Fingerprint verification is manual; the app does not force users to confirm before chatting
+- Fingerprint verification is enforced before messaging (compare out-of-band, then confirm in UI); a peer key change requires re-verification
 - Browser runtime uses P-256 Web Crypto; the Python crypto_core reference may use related curves for testing — docs should be read with that distinction in mind
 - No Signal-style double ratchet / full forward-secrecy protocol beyond per-session keys — messages sent while a peer is offline can fail to decrypt if the session key is re-established before that peer reads them
 - Compromised client devices are out of scope for E2E guarantees
@@ -267,6 +270,26 @@ The application is deployed to a live, publicly reachable environment on AWS, co
 
 ---
 
+
+
 ## 14. AI Assistance Statement
 
 Parts of this project were developed with assistance from AI tools (including Cursor / Claude and ChatGPT), primarily for explaining cryptographic concepts, drafting boilerplate, iterating UI/API structure, and troubleshooting the AWS/Docker/Nginx deployment pipeline. All AI-assisted work was reviewed, tested, and adapted by the group. Conversation links and logs are included in the AI assistance evidence submitted with this CA, as required by module guidelines.
+
+
+
+
+
+
+
+
+
+###Folder
+
+https://mydbs-my.sharepoint.com/:f:/g/personal/20094573_mydbs_ie/IgA9p6hoBc0AQLvWMquYwJ-yAdDmp7Z60SUQdPperpjIPW8?e=FZQdop
+
+
+
+
+
+

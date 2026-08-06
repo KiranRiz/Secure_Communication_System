@@ -5,6 +5,8 @@ let currentRecipient = null;
 let aesKey = null;
 let myKeyPair = null;
 let myPublicKeyHex = null;
+let currentPeerPublicKeyHex = null;
+let fingerprintVerified = false;
 let typingTimer = null;
 let historyLoadedFor = null;
 let requestInFlight = false;
@@ -16,6 +18,11 @@ const renderedMsgIds = new Set();
 const onlineUsers = new Set();
 let conversations = [];
 let myProfile = null;
+/** In-memory only: peer -> CryptoKey[] (never persisted) */
+const conversationKeyRing = {};
+const IDB_NAME = "sc_secure_keys";
+const IDB_STORE = "ecdh_keys";
+const IDB_VERSION = 1;
 
 function storageKey(suffix) {
   return `sc_${CURRENT_USER}_${suffix}`;
@@ -128,99 +135,142 @@ function setLocalPreview(peer, text) {
   );
 }
 
-// ── Persistent ECDH + conversation AES keys ──
+// ── ECDH in IndexedDB (non-extractable private key) + in-memory AES ──
+
+function openKeyDb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, IDB_VERSION);
+    req.onerror = () => reject(req.error || new Error("IndexedDB open failed"));
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(IDB_STORE)) {
+        db.createObjectStore(IDB_STORE);
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+  });
+}
+
+async function idbSet(key, value) {
+  const db = await openKeyDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, "readwrite");
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.objectStore(IDB_STORE).put(value, key);
+  });
+}
+
+async function idbGet(key) {
+  const db = await openKeyDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, "readonly");
+    const req = tx.objectStore(IDB_STORE).get(key);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function idbDelete(key) {
+  const db = await openKeyDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, "readwrite");
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.objectStore(IDB_STORE).delete(key);
+  });
+}
+
+function clearLegacyKeyStorage() {
+  // Remove insecure localStorage key material from older builds
+  try {
+    localStorage.removeItem(storageKey("ecdh"));
+    localStorage.removeItem(storageKey("conv_keys"));
+  } catch (e) {}
+}
 
 async function saveMyKeyPair() {
-  const privateJwk = await window.crypto.subtle.exportKey(
-    "jwk",
-    myKeyPair.privateKey,
-  );
-  const publicJwk = await window.crypto.subtle.exportKey(
-    "jwk",
-    myKeyPair.publicKey,
-  );
-  localStorage.setItem(
-    storageKey("ecdh"),
-    JSON.stringify({
-      privateJwk,
-      publicJwk,
-      publicKeyHex: myPublicKeyHex,
-    }),
-  );
+  // Persist CryptoKey objects via IndexedDB structured clone.
+  // Private key is non-extractable — cannot be exported as JWK.
+  await idbSet(storageKey("ecdh"), {
+    privateKey: myKeyPair.privateKey,
+    publicKey: myKeyPair.publicKey,
+    publicKeyHex: myPublicKeyHex,
+  });
 }
 
 async function loadMyKeyPair() {
-  const raw = localStorage.getItem(storageKey("ecdh"));
-  if (!raw) return false;
+  clearLegacyKeyStorage();
   try {
-    const data = JSON.parse(raw);
-    const privateKey = await window.crypto.subtle.importKey(
-      "jwk",
-      data.privateJwk,
-      { name: "ECDH", namedCurve: "P-256" },
-      true,
-      ["deriveKey", "deriveBits"],
-    );
-    const publicKey = await window.crypto.subtle.importKey(
-      "jwk",
-      data.publicJwk,
-      { name: "ECDH", namedCurve: "P-256" },
-      true,
-      [],
-    );
-    myKeyPair = { privateKey, publicKey };
+    const data = await idbGet(storageKey("ecdh"));
+    if (!data || !data.privateKey || !data.publicKey || !data.publicKeyHex) {
+      return false;
+    }
+    myKeyPair = {
+      privateKey: data.privateKey,
+      publicKey: data.publicKey,
+    };
     myPublicKeyHex = data.publicKeyHex;
     return true;
   } catch (e) {
-    localStorage.removeItem(storageKey("ecdh"));
+    try {
+      await idbDelete(storageKey("ecdh"));
+    } catch (err) {}
     return false;
   }
 }
 
-function getConversationKeys() {
-  try {
-    return JSON.parse(localStorage.getItem(storageKey("conv_keys")) || "{}");
-  } catch (e) {
-    return {};
-  }
-}
-
-function saveConversationKeys(map) {
-  localStorage.setItem(storageKey("conv_keys"), JSON.stringify(map));
-}
-
-async function rememberConversationKey(peer, peerPublicKeyHex, key) {
-  const raw = await window.crypto.subtle.exportKey("raw", key);
-  const aesHex = bufferToHex(raw);
-  const map = getConversationKeys();
-  const list = map[peer] || [];
-  if (!list.includes(aesHex)) {
-    list.push(aesHex);
-    map[peer] = list.slice(-5);
-  }
-  map[peer + "__pub"] = peerPublicKeyHex;
-  saveConversationKeys(map);
-  localStorage.setItem(storageKey("last_recipient"), peer);
-}
-
-async function importAesKeyFromHex(hex) {
-  return window.crypto.subtle.importKey(
-    "raw",
-    hexToBuffer(hex),
-    { name: "AES-GCM", length: 256 },
+async function generateNonExtractableKeyPair() {
+  // generateKey extractable flag applies to both keys, so we:
+  // 1) generate extractable once, 2) export public raw, 3) re-import
+  // private as non-extractable, then discard extractable originals.
+  const temp = await window.crypto.subtle.generateKey(
+    { name: "ECDH", namedCurve: "P-256" },
     true,
-    ["encrypt", "decrypt"],
+    ["deriveKey", "deriveBits"],
   );
+  const publicRaw = await window.crypto.subtle.exportKey("raw", temp.publicKey);
+  const privateJwk = await window.crypto.subtle.exportKey("jwk", temp.privateKey);
+
+  const privateKey = await window.crypto.subtle.importKey(
+    "jwk",
+    privateJwk,
+    { name: "ECDH", namedCurve: "P-256" },
+    false, // non-extractable — never exportable again
+    ["deriveKey", "deriveBits"],
+  );
+  const publicKey = await window.crypto.subtle.importKey(
+    "raw",
+    publicRaw,
+    { name: "ECDH", namedCurve: "P-256" },
+    true,
+    [],
+  );
+
+  return {
+    privateKey,
+    publicKey,
+    publicKeyHex: bufferToHex(publicRaw),
+  };
+}
+
+function rememberConversationKeyInMemory(peer, peerPublicKeyHex, key) {
+  if (!conversationKeyRing[peer]) conversationKeyRing[peer] = [];
+  const list = conversationKeyRing[peer];
+  if (!list.includes(key)) {
+    list.push(key);
+    conversationKeyRing[peer] = list.slice(-5);
+  }
+  currentPeerPublicKeyHex = peerPublicKeyHex;
+  sessionStorage.setItem(storageKey("last_recipient"), peer);
+  sessionStorage.setItem(storageKey("peer_pub_" + peer), peerPublicKeyHex);
 }
 
 async function decryptWithKeyRing(peer, nonceHex, ciphertextHex) {
   const candidates = [];
   if (aesKey && currentRecipient === peer) candidates.push(aesKey);
-  const stored = getConversationKeys()[peer] || [];
-  for (const hex of stored) {
-    try {
-      candidates.push(await importAesKeyFromHex(hex));
-    } catch (e) {}
+  for (const key of conversationKeyRing[peer] || []) {
+    candidates.push(key);
   }
   let lastErr = null;
   for (const key of candidates) {
@@ -231,6 +281,32 @@ async function decryptWithKeyRing(peer, nonceHex, ciphertextHex) {
     }
   }
   throw lastErr || new Error("No key could decrypt message");
+}
+
+function getTrustedPeers() {
+  try {
+    return JSON.parse(sessionStorage.getItem(storageKey("trusted_peers")) || "{}");
+  } catch (e) {
+    return {};
+  }
+}
+
+function setPeerTrusted(peer, peerPublicKeyHex) {
+  const map = getTrustedPeers();
+  map[peer] = peerPublicKeyHex;
+  sessionStorage.setItem(storageKey("trusted_peers"), JSON.stringify(map));
+}
+
+function isPeerTrusted(peer, peerPublicKeyHex) {
+  if (!peer || !peerPublicKeyHex) return false;
+  return getTrustedPeers()[peer] === peerPublicKeyHex;
+}
+
+function setComposerEnabled(enabled) {
+  const input = document.getElementById("message-input");
+  const sendBtn = document.getElementById("send-btn");
+  if (input) input.disabled = !enabled;
+  if (sendBtn) sendBtn.disabled = !enabled;
 }
 
 // ── Loaders & skeletons ──
@@ -567,6 +643,9 @@ async function openConversation(peer, displayName, avatarUrl) {
   document.getElementById("send-btn").disabled = true;
   document.getElementById("key-panel").hidden = false;
   document.getElementById("fingerprint-display").style.display = "none";
+  fingerprintVerified = false;
+  currentPeerPublicKeyHex = null;
+  aesKey = null;
   document.getElementById("key-panel").style.background = "";
 
   showChatPanel();
@@ -595,7 +674,7 @@ function initSocket() {
     await loadSidebar();
     showAppLoader(false);
 
-    const last = localStorage.getItem(storageKey("last_recipient"));
+    const last = sessionStorage.getItem(storageKey("last_recipient"));
     if (last) {
       const found = conversations.find((c) => c.peer === last);
       await openConversation(
@@ -719,16 +798,12 @@ async function uploadMyKey() {
   try {
     const restored = await loadMyKeyPair();
     if (!restored) {
-      myKeyPair = await window.crypto.subtle.generateKey(
-        { name: "ECDH", namedCurve: "P-256" },
-        true,
-        ["deriveKey", "deriveBits"],
-      );
-      const myPublicKeyBuffer = await window.crypto.subtle.exportKey(
-        "raw",
-        myKeyPair.publicKey,
-      );
-      myPublicKeyHex = bufferToHex(myPublicKeyBuffer);
+      const generated = await generateNonExtractableKeyPair();
+      myKeyPair = {
+        privateKey: generated.privateKey,
+        publicKey: generated.publicKey,
+      };
+      myPublicKeyHex = generated.publicKeyHex;
       await saveMyKeyPair();
     }
 
@@ -815,14 +890,18 @@ async function startKeyExchange(isAuto = false, options = {}) {
             `User "${recipient}" is not registered. Ask them to create an account first.`,
         );
         currentRecipient = null;
-        localStorage.removeItem(storageKey("last_recipient"));
+        sessionStorage.removeItem(storageKey("last_recipient"));
         showEmptyState();
         return;
       }
 
-      const restored = await restoreAesFromStorage(recipient);
+      const restored = await restoreAesFromPeer(recipient);
       if (restored) {
-        enableChatUi(recipient);
+        enableChatUi(
+          recipient,
+          currentPeerPublicKeyHex ||
+            sessionStorage.getItem(storageKey("peer_pub_" + recipient)),
+        );
         if (!silent) showChatLoader(true, "Loading messages...");
         await loadHistory(recipient);
         if (!silent) {
@@ -874,12 +953,12 @@ async function startKeyExchange(isAuto = false, options = {}) {
       { name: "ECDH", public: recipientPublicKey },
       myKeyPair.privateKey,
       { name: "AES-GCM", length: 256 },
-      true,
+      false, // non-extractable — never export raw AES to storage
       ["encrypt", "decrypt"],
     );
 
-    await rememberConversationKey(recipient, data.public_key, aesKey);
-    enableChatUi(recipient);
+    rememberConversationKeyInMemory(recipient, data.public_key, aesKey);
+    enableChatUi(recipient, data.public_key);
     if (!silent) showChatLoader(true, "Loading messages...");
     historyLoadedFor = null;
     await loadHistory(recipient);
@@ -899,27 +978,71 @@ async function startKeyExchange(isAuto = false, options = {}) {
   }
 }
 
-async function restoreAesFromStorage(peer) {
-  const list = getConversationKeys()[peer] || [];
-  if (!list.length) return false;
+async function restoreAesFromPeer(peer) {
+  // Re-derive in memory from peer public key (never load AES from disk)
+  if (conversationKeyRing[peer] && conversationKeyRing[peer].length) {
+    aesKey = conversationKeyRing[peer][conversationKeyRing[peer].length - 1];
+    currentPeerPublicKeyHex =
+      sessionStorage.getItem(storageKey("peer_pub_" + peer)) ||
+      currentPeerPublicKeyHex;
+    return true;
+  }
+  const peerPub =
+    sessionStorage.getItem(storageKey("peer_pub_" + peer)) || null;
+  if (!peerPub || !myKeyPair) return false;
   try {
-    aesKey = await importAesKeyFromHex(list[list.length - 1]);
+    const recipientPublicKey = await window.crypto.subtle.importKey(
+      "raw",
+      hexToBuffer(peerPub),
+      { name: "ECDH", namedCurve: "P-256" },
+      false,
+      [],
+    );
+    aesKey = await window.crypto.subtle.deriveKey(
+      { name: "ECDH", public: recipientPublicKey },
+      myKeyPair.privateKey,
+      { name: "AES-GCM", length: 256 },
+      false,
+      ["encrypt", "decrypt"],
+    );
+    rememberConversationKeyInMemory(peer, peerPub, aesKey);
     return true;
   } catch (e) {
     return false;
   }
 }
 
-function enableChatUi(recipient) {
-  const fingerprint = formatFingerprint(myPublicKeyHex || "");
+function enableChatUi(recipient, peerPublicKeyHex) {
+  currentPeerPublicKeyHex = peerPublicKeyHex || currentPeerPublicKeyHex || "";
+  fingerprintVerified = isPeerTrusted(recipient, currentPeerPublicKeyHex);
+
+  const fingerprint = formatFingerprint(currentPeerPublicKeyHex);
   const fpBox = document.getElementById("fingerprint-display");
   fpBox.style.display = "block";
-  fpBox.innerHTML = `Encrypted session with <b>${escapeHtml(recipient)}</b><br>
-         Fingerprint: <code>${fingerprint}</code>`;
-  document.getElementById("message-input").disabled = false;
-  document.getElementById("send-btn").disabled = false;
+
+  if (fingerprintVerified) {
+    fpBox.innerHTML = `Encrypted session with <b>${escapeHtml(recipient)}</b><br>
+         Fingerprint: <code>${fingerprint}</code><br>
+         <span class="fp-verified">Fingerprint verified — messaging enabled</span>`;
+    setComposerEnabled(true);
+  } else {
+    fpBox.innerHTML = `Encrypted session with <b>${escapeHtml(recipient)}</b><br>
+         Fingerprint: <code>${fingerprint}</code><br>
+         <span class="fp-warn">Compare this fingerprint out-of-band, then confirm to enable messaging.</span><br>
+         <button type="button" class="btn-primary small" id="verify-fp-btn"
+                 onclick="confirmFingerprint()">I verified this fingerprint</button>`;
+    setComposerEnabled(false);
+  }
   document.getElementById("key-panel").style.background =
     "rgba(45,212,191,0.08)";
+}
+
+function confirmFingerprint() {
+  if (!currentRecipient || !currentPeerPublicKeyHex) return;
+  setPeerTrusted(currentRecipient, currentPeerPublicKeyHex);
+  fingerprintVerified = true;
+  enableChatUi(currentRecipient, currentPeerPublicKeyHex);
+  addSystemMessage("Fingerprint verified. You can send encrypted messages.");
 }
 
 async function loadHistory(peer) {
@@ -1010,6 +1133,13 @@ async function sendMessage() {
   const text = input.value.trim();
   if (!text || !socket || !socket.connected || !aesKey || !currentRecipient)
     return;
+  if (!fingerprintVerified || !isPeerTrusted(currentRecipient, currentPeerPublicKeyHex)) {
+    openNoticeModal(
+      "Verify fingerprint first",
+      "Compare the session fingerprint out-of-band with your contact, then click “I verified this fingerprint” before sending.",
+    );
+    return;
+  }
   if (sendBtn.disabled && sendBtn.classList.contains("is-loading")) return;
 
   setControlLoading(sendBtn, true, "...");
@@ -1029,9 +1159,12 @@ async function sendMessage() {
     addSystemMessage("Send failed: " + e.message);
   } finally {
     setControlLoading(sendBtn, false);
-    // keep enabled only if session is ready
-    sendBtn.disabled = !aesKey;
-    input.disabled = !aesKey;
+    const ready =
+      !!aesKey &&
+      fingerprintVerified &&
+      isPeerTrusted(currentRecipient, currentPeerPublicKeyHex);
+    sendBtn.disabled = !ready;
+    input.disabled = !ready;
   }
 }
 
@@ -1152,9 +1285,18 @@ async function confirmLogout() {
     });
   } catch (e) {}
   stopKeyRetries();
-  localStorage.removeItem(storageKey("ecdh"));
-  localStorage.removeItem(storageKey("conv_keys"));
-  localStorage.removeItem(storageKey("last_recipient"));
+  clearLegacyKeyStorage();
+  try {
+    await idbDelete(storageKey("ecdh"));
+  } catch (e) {}
+  sessionStorage.removeItem(storageKey("last_recipient"));
+  sessionStorage.removeItem(storageKey("trusted_peers"));
+  Object.keys(sessionStorage)
+    .filter((k) => k.startsWith(storageKey("peer_pub_")))
+    .forEach((k) => sessionStorage.removeItem(k));
+  for (const k of Object.keys(conversationKeyRing)) {
+    delete conversationKeyRing[k];
+  }
   localStorage.removeItem("access_token");
   localStorage.removeItem("refresh_token");
   localStorage.removeItem("username");
