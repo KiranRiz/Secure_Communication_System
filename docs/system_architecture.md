@@ -279,12 +279,12 @@ Issues hit during AWS bring-up and how they were fixed are documented in the REA
 
 ## Limitations we're aware of
 
-**Manual fingerprint verification** — shown in UI but not enforced before chat.
+**Fingerprint verification** — messaging is blocked until the user confirms the peer fingerprint; a peer public-key change requires re-verification (TOFU).
 
 **No Signal-style double ratchet** — per-session keys only; no full forward-secrecy protocol beyond that.
 
 **Offline / re-key edge case** — messages sent while a peer is offline can fail to decrypt if the session key is re-established before that peer reads them.
 
-**In-memory ReplayGuard** — seen `msg_id` set lives in the server process; a restart clears it. A Redis-backed store would be more robust for multi-instance scale.
+**ReplayGuard** — seen `msg_id` values are stored in MongoDB with TTL (5-minute window) so protection survives restarts and works across workers.
 
 **Compromised client devices** — outside what end-to-end encryption can promise.

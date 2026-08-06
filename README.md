@@ -249,7 +249,7 @@ The application is deployed to a live, publicly reachable environment on AWS, co
 
 ## 12. Known Limitations
 
-- Fingerprint verification is manual; the app does not force users to confirm before chatting
+- Fingerprint verification is enforced before messaging (compare out-of-band, then confirm in UI); a peer key change requires re-verification
 - Browser runtime uses P-256 Web Crypto; the Python crypto_core reference may use related curves for testing — docs should be read with that distinction in mind
 - No Signal-style double ratchet / full forward-secrecy protocol beyond per-session keys — messages sent while a peer is offline can fail to decrypt if the session key is re-established before that peer reads them
 - Compromised client devices are out of scope for E2E guarantees
