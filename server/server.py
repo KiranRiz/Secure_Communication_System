@@ -59,12 +59,23 @@ limiter = Limiter(
     storage_uri="memory://",
 )
 
+def _resolve_async_mode():
+    """Prefer eventlet (Docker/production); fall back for incompatible Python envs."""
+    try:
+        import importlib
+
+        importlib.import_module("engineio.async_drivers.eventlet")
+        return "eventlet"
+    except Exception:
+        return "threading"
+
+
 socketio = SocketIO(
     app,
     cors_allowed_origins=Config.CORS_ORIGINS,
     logger=False,
     engineio_logger=False,
-    async_mode="eventlet",
+    async_mode=_resolve_async_mode(),
 )
 
 auth = AuthManager()
