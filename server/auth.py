@@ -48,10 +48,24 @@ class AuthManager:
         if pwd_err:
             return {"success": False, "message": pwd_err}
 
-        if db.users.find_one({"username": username}):
-            return {"success": False, "message": "Username already exists"}
-        if db.users.find_one({"email": email}):
-            return {"success": False, "message": "Email already registered"}
+        # Anti-enumeration: do not reveal whether username or email already exists
+        existing_user = db.users.find_one({
+            "$or": [{"username": username}, {"email": email}],
+            "is_deleted": {"$ne": True},
+        })
+        if existing_user:
+            log_security_event(
+                "register_conflict",
+                username=username,
+                ip=meta.get("ip"),
+                user_agent=meta.get("user_agent"),
+                details={"email": email},
+            )
+            return {
+                "success": False,
+                "message": "Unable to register with these details. "
+                           "Try different credentials or log in if you already have an account.",
+            }
 
         now = utcnow()
         user_doc = {
@@ -114,7 +128,7 @@ class AuthManager:
         db = get_db()
         user = db.users.find_one({"email": email})
         if not user:
-            return {"success": False, "message": "User not found"}
+            return {"success": False, "message": "Invalid or expired OTP"}
 
         db.users.update_one(
             {"_id": user["_id"]},
