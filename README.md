@@ -11,6 +11,22 @@
 
 ---
 
+## Updates — Peer Vulnerability Fixes
+
+Following peer penetration testing (StudySafe Vulnerability Analysis, August 2026), the issues below were remediated **without removing features or redesigning the UI**. Full write-up: [`docs/Vulnerability_Remediation_Report.md`](docs/Vulnerability_Remediation_Report.md).
+
+| ID | Finding | Severity | Fix applied |
+|---|---|---|---|
+| 1.1 | Private ECDH keys stored in `localStorage` (extractable JWK) | Critical / High | Private keys stored as **non-extractable** `CryptoKey` objects in **IndexedDB** only; legacy `localStorage` key material cleared |
+| 1.2 | Derived AES session keys stored in `localStorage` | High | AES-256-GCM keys kept **in memory only** (`extractable: false`); no raw AES hex persisted to disk |
+| 1.3 | Fingerprint verification optional — users could chat without confirming | High | **Send blocked** until user confirms peer fingerprint out-of-band; peer key change requires re-verification (TOFU) |
+| 1.4 | ReplayGuard held seen `msg_id`s in process memory only | Medium–High | Seen IDs persisted in **MongoDB** (`replay_ids`) with **unique + TTL** indexes (5-minute window; survives restarts) |
+| 1.5 | Registration revealed “username already exists” / “email already registered” | Medium | **Generic** registration conflict message; no account enumeration via distinct errors |
+
+**Also addressed during hardening:** Socket.IO `eventlet` compatibility on Python 3.14 (`async_mode` fallback), and local demo `SERVER_URL` corrected to localhost when a stale LAN IP caused “Server not reachable”.
+
+---
+
 ## 1. Project Overview
 
 This Continuous Assessment (CA_ONE) delivers an end-to-end encrypted messaging system in which two users who have never previously met to exchange keys can communicate securely through an untrusted relay server.
